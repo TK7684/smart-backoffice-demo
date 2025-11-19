@@ -24,17 +24,27 @@ const SHEET_NAME = 'Leads'; // Sheet name where data will be saved
  * Handle POST request from the form
  */
 function doPost(e) {
+  Logger.log('=== doPost() called ===');
+  Logger.log('Timestamp: ' + new Date().toISOString());
+  Logger.log('Request method: POST');
+  
   try {
     // Parse the data - handle both JSON and form data
+    Logger.log('Parsing request data...');
     let data;
     if (e.postData && e.postData.contents) {
       // JSON POST
+      Logger.log('Data format: JSON POST');
       data = JSON.parse(e.postData.contents);
+      Logger.log('Parsed JSON data: ' + JSON.stringify(data));
     } else if (e.parameter && e.parameter.data) {
       // Form POST with data parameter
+      Logger.log('Data format: Form POST with data parameter');
       data = JSON.parse(e.parameter.data);
+      Logger.log('Parsed form data: ' + JSON.stringify(data));
     } else {
       // Form POST with individual parameters
+      Logger.log('Data format: Form POST with individual parameters');
       data = {
         businessName: e.parameter.businessName || '',
         businessType: e.parameter.businessType || '',
@@ -44,15 +54,21 @@ function doPost(e) {
         lineId: e.parameter.lineId || '',
         timestamp: e.parameter.timestamp || new Date().toISOString()
       };
+      Logger.log('Constructed data object: ' + JSON.stringify(data));
     }
     
     // Open the spreadsheet
+    Logger.log('Opening spreadsheet: ' + SPREADSHEET_ID);
     const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    Logger.log('Spreadsheet opened: ' + ss.getName());
+    
     let sheet = ss.getSheetByName(SHEET_NAME);
     
     // Create sheet if it doesn't exist
     if (!sheet) {
+      Logger.log('Sheet "' + SHEET_NAME + '" does not exist, creating new sheet...');
       sheet = ss.insertSheet(SHEET_NAME);
+      Logger.log('New sheet created: ' + sheet.getName());
       // Add headers
       sheet.getRange(1, 1, 1, 8).setValues([[
         'Timestamp',
@@ -64,21 +80,28 @@ function doPost(e) {
         'LINE ID',
         'Date Submitted'
       ]]);
+      Logger.log('Headers added to sheet');
       // Format header row
       sheet.getRange(1, 1, 1, 8).setFontWeight('bold');
       sheet.getRange(1, 1, 1, 8).setBackground('#8b7355');
       sheet.getRange(1, 1, 1, 8).setFontColor('#ffffff');
+      Logger.log('Header row formatted');
+    } else {
+      Logger.log('Using existing sheet: ' + sheet.getName());
     }
     
     // Get the next row
-    const nextRow = sheet.getLastRow() + 1;
+    const lastRow = sheet.getLastRow();
+    const nextRow = lastRow + 1;
+    Logger.log('Last row: ' + lastRow + ', Next row: ' + nextRow);
     
     // Format timestamp
     const now = new Date();
     const dateStr = Utilities.formatDate(now, Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss');
+    Logger.log('Formatted timestamp: ' + dateStr);
     
     // Add the data
-    sheet.getRange(nextRow, 1, 1, 8).setValues([[
+    const rowData = [
       data.timestamp || dateStr,
       data.businessName || '',
       data.businessType || '',
@@ -87,40 +110,61 @@ function doPost(e) {
       data.phone || '',
       data.lineId || '',
       dateStr
-    ]]);
+    ];
+    Logger.log('Row data to insert: ' + JSON.stringify(rowData));
+    sheet.getRange(nextRow, 1, 1, 8).setValues([rowData]);
+    Logger.log('Data inserted into row ' + nextRow);
     
     // Auto-resize columns
     sheet.autoResizeColumns(1, 8);
+    Logger.log('Columns auto-resized');
     
     // Create template spreadsheet for the user
+    Logger.log('Creating template spreadsheet...');
     const templateSpreadsheetId = createTemplateSpreadsheet(data);
+    Logger.log('Template spreadsheet ID: ' + (templateSpreadsheetId || 'null'));
     
     // Send email notification with template link
+    Logger.log('Sending email notification to admin...');
     sendEmailNotification(data, templateSpreadsheetId);
+    Logger.log('Admin email notification sent');
     
     // Send template link to user
     if (templateSpreadsheetId && data.email) {
+      Logger.log('Sending template email to user: ' + data.email);
       sendTemplateEmailToUser(data, templateSpreadsheetId);
+      Logger.log('User email sent');
+    } else {
+      Logger.log('Skipping user email - templateSpreadsheetId: ' + templateSpreadsheetId + ', email: ' + (data.email || 'missing'));
     }
     
     // Return success response with template link
+    const response = {
+      success: true,
+      message: 'Lead saved successfully',
+      row: nextRow,
+      templateSpreadsheetId: templateSpreadsheetId,
+      templateUrl: `https://docs.google.com/spreadsheets/d/${templateSpreadsheetId}/edit`
+    };
+    Logger.log('Returning success response: ' + JSON.stringify(response));
+    Logger.log('=== doPost() completed successfully ===');
     return ContentService
-      .createTextOutput(JSON.stringify({
-        success: true,
-        message: 'Lead saved successfully',
-        row: nextRow,
-        templateSpreadsheetId: templateSpreadsheetId,
-        templateUrl: `https://docs.google.com/spreadsheets/d/${templateSpreadsheetId}/edit`
-      }))
+      .createTextOutput(JSON.stringify(response))
       .setMimeType(ContentService.MimeType.JSON);
       
   } catch (error) {
+    Logger.log('=== ERROR in doPost() ===');
+    Logger.log('Error message: ' + error.toString());
+    Logger.log('Error stack: ' + (error.stack || 'No stack trace'));
+    Logger.log('Error name: ' + error.name);
     // Return error response with CORS headers
+    const errorResponse = {
+      success: false,
+      error: error.toString()
+    };
+    Logger.log('Returning error response: ' + JSON.stringify(errorResponse));
     return ContentService
-      .createTextOutput(JSON.stringify({
-        success: false,
-        error: error.toString()
-      }))
+      .createTextOutput(JSON.stringify(errorResponse))
       .setMimeType(ContentService.MimeType.JSON);
   }
 }
@@ -129,6 +173,11 @@ function doPost(e) {
  * Handle OPTIONS request for CORS preflight
  */
 function doOptions() {
+  Logger.log('=== doOptions() called ===');
+  Logger.log('Timestamp: ' + new Date().toISOString());
+  Logger.log('Request method: OPTIONS (CORS preflight)');
+  Logger.log('Returning empty response for CORS preflight');
+  Logger.log('=== doOptions() completed ===');
   return ContentService
     .createTextOutput('')
     .setMimeType(ContentService.MimeType.JSON);
@@ -138,11 +187,23 @@ function doOptions() {
  * Handle GET request (for testing)
  */
 function doGet(e) {
+  Logger.log('=== doGet() called ===');
+  Logger.log('Timestamp: ' + new Date().toISOString());
+  Logger.log('Request method: GET');
+  if (e && e.parameter) {
+    Logger.log('Request parameters: ' + JSON.stringify(e.parameter));
+  }
+  
+  const response = {
+    message: 'Lead Collection API is running',
+    status: 'OK',
+    timestamp: new Date().toISOString(),
+    spreadsheetId: SPREADSHEET_ID
+  };
+  Logger.log('Returning health check response: ' + JSON.stringify(response));
+  Logger.log('=== doGet() completed ===');
   return ContentService
-    .createTextOutput(JSON.stringify({
-      message: 'Lead Collection API is running',
-      status: 'OK'
-    }))
+    .createTextOutput(JSON.stringify(response))
     .setMimeType(ContentService.MimeType.JSON);
 }
 
@@ -150,43 +211,67 @@ function doGet(e) {
  * Create template spreadsheet for the user
  */
 function createTemplateSpreadsheet(leadData) {
+  Logger.log('=== createTemplateSpreadsheet() called ===');
+  Logger.log('Lead data: ' + JSON.stringify(leadData));
+  
   try {
     // Create a new spreadsheet
     const spreadsheetName = `Template - ${leadData.businessName || 'Demo'} - ${Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd')}`;
+    Logger.log('Creating spreadsheet with name: ' + spreadsheetName);
     const newSpreadsheet = SpreadsheetApp.create(spreadsheetName);
     const spreadsheetId = newSpreadsheet.getId();
+    Logger.log('Spreadsheet created with ID: ' + spreadsheetId);
     
     // Delete default sheet
     const defaultSheet = newSpreadsheet.getSheets()[0];
     if (defaultSheet) {
+      Logger.log('Deleting default sheet: ' + defaultSheet.getName());
       newSpreadsheet.deleteSheet(defaultSheet);
+      Logger.log('Default sheet deleted');
     }
     
     // Create all template sheets
+    Logger.log('Creating template sheets...');
     createOrdersSheet(newSpreadsheet);
+    Logger.log('Orders sheet created');
     createProductsSheet(newSpreadsheet);
+    Logger.log('Products sheet created');
     createCustomersSheet(newSpreadsheet);
+    Logger.log('Customers sheet created');
     createAnalyticsSheet(newSpreadsheet);
+    Logger.log('Analytics sheet created');
     createInventorySheet(newSpreadsheet);
+    Logger.log('Inventory sheet created');
     createAppointmentsSheet(newSpreadsheet);
+    Logger.log('Appointments sheet created');
     
     // Set the first sheet as active
     const firstSheet = newSpreadsheet.getSheets()[0];
     if (firstSheet) {
+      Logger.log('Setting active sheet: ' + firstSheet.getName());
       newSpreadsheet.setActiveSheet(firstSheet);
     }
     
     // Share with the user's email (if provided)
     if (leadData.email) {
+      Logger.log('Sharing spreadsheet with user email: ' + leadData.email);
       try {
         newSpreadsheet.addEditor(leadData.email);
+        Logger.log('Spreadsheet shared successfully with ' + leadData.email);
       } catch (e) {
+        Logger.log('ERROR sharing spreadsheet: ' + e.toString());
         console.error('Error sharing spreadsheet:', e);
       }
+    } else {
+      Logger.log('No email provided, skipping sharing');
     }
     
+    Logger.log('=== createTemplateSpreadsheet() completed successfully ===');
     return spreadsheetId;
   } catch (error) {
+    Logger.log('=== ERROR in createTemplateSpreadsheet() ===');
+    Logger.log('Error message: ' + error.toString());
+    Logger.log('Error stack: ' + (error.stack || 'No stack trace'));
     console.error('Error creating template spreadsheet:', error);
     return null;
   }
@@ -196,7 +281,10 @@ function createTemplateSpreadsheet(leadData) {
  * Create Orders sheet
  */
 function createOrdersSheet(spreadsheet) {
+  Logger.log('=== createOrdersSheet() called ===');
+  Logger.log('Spreadsheet ID: ' + spreadsheet.getId());
   const sheet = spreadsheet.insertSheet('ออเดอร์');
+  Logger.log('Orders sheet created: ' + sheet.getName());
   const headers = ['วันที่', 'เวลา', 'เลขที่ออเดอร์', 'รหัสลูกค้า', 'ชื่อลูกค้า', 'รายการ', 'จำนวน', 'ราคาต่อหน่วย', 'ยอดรวม', 'ส่วนลด', 'ยอดสุทธิ', 'สถานะ', 'ช่องทางการขาย', 'หมายเหตุ'];
   const sampleData = [
     ['2024-01-15', '10:15', 'ORD-001', 'C001', 'คุณโบ', 'อาบน้ำ+ตัดขน', '1', '890', '890', '0', '890', 'เสร็จแล้ว', 'หน้าร้าน', ''],
@@ -213,7 +301,10 @@ function createOrdersSheet(spreadsheet) {
  * Create Products sheet
  */
 function createProductsSheet(spreadsheet) {
+  Logger.log('=== createProductsSheet() called ===');
+  Logger.log('Spreadsheet ID: ' + spreadsheet.getId());
   const sheet = spreadsheet.insertSheet('สินค้า/บริการ');
+  Logger.log('Products sheet created: ' + sheet.getName());
   const headers = ['รหัสสินค้า', 'ชื่อสินค้า/บริการ', 'ประเภท', 'หมวดหมู่', 'ราคาขาย', 'ต้นทุน', 'กำไรต่อหน่วย', 'กำไร%', 'สต็อกปัจจุบัน', 'สต็อกขั้นต่ำ', 'หน่วย', 'ผู้จำหน่าย', 'สถานะ', 'วันที่เพิ่ม'];
   const sampleData = [
     ['P001', 'อาบน้ำสุนัข', 'บริการ', 'บริการดูแล', '300', '100', '200', '66.7%', '-', '-', 'ครั้ง', '-', 'เปิดใช้งาน', '2024-01-01'],
@@ -230,7 +321,10 @@ function createProductsSheet(spreadsheet) {
  * Create Customers sheet
  */
 function createCustomersSheet(spreadsheet) {
+  Logger.log('=== createCustomersSheet() called ===');
+  Logger.log('Spreadsheet ID: ' + spreadsheet.getId());
   const sheet = spreadsheet.insertSheet('ลูกค้า');
+  Logger.log('Customers sheet created: ' + sheet.getName());
   const headers = ['รหัสลูกค้า', 'ชื่อ-นามสกุล', 'เบอร์โทร', 'อีเมล', 'LINE ID', 'ที่อยู่', 'ประเภท', 'วันที่สมัคร', 'คะแนนสะสม', 'ยอดซื้อรวม', 'จำนวนออเดอร์', 'ออเดอร์ล่าสุด', 'สถานะ', 'หมายเหตุ'];
   const sampleData = [
     ['C001', 'คุณโบ', '081-234-5678', 'bo@email.com', '@bo123', 'กรุงเทพฯ', 'สมาชิก', '2024-01-01', '250', '3240', '5', '2024-01-15', 'ใช้งาน', 'ลูกค้าประจำ'],
@@ -247,7 +341,10 @@ function createCustomersSheet(spreadsheet) {
  * Create Analytics sheet
  */
 function createAnalyticsSheet(spreadsheet) {
+  Logger.log('=== createAnalyticsSheet() called ===');
+  Logger.log('Spreadsheet ID: ' + spreadsheet.getId());
   const sheet = spreadsheet.insertSheet('วิเคราะห์');
+  Logger.log('Analytics sheet created: ' + sheet.getName());
   const headers = ['วันที่', 'ยอดขายรวม', 'จำนวนออเดอร์', 'ลูกค้าใหม่', 'ลูกค้าเก่า', 'ออเดอร์หน้าร้าน', 'ออเดอร์ออนไลน์', 'กำไรรวม', 'ค่าใช้จ่าย', 'กำไรสุทธิ', 'อัตรากำไร%', 'ยอดขายเฉลี่ย/ออเดอร์'];
   const sampleData = [
     ['2024-01-15', '12450', '24', '5', '19', '15', '9', '4980', '1200', '3780', '30.3%', '518.75'],
@@ -264,7 +361,10 @@ function createAnalyticsSheet(spreadsheet) {
  * Create Inventory sheet
  */
 function createInventorySheet(spreadsheet) {
+  Logger.log('=== createInventorySheet() called ===');
+  Logger.log('Spreadsheet ID: ' + spreadsheet.getId());
   const sheet = spreadsheet.insertSheet('สต็อก');
+  Logger.log('Inventory sheet created: ' + sheet.getName());
   const headers = ['รหัสสินค้า', 'ชื่อสินค้า', 'สต็อกปัจจุบัน', 'สต็อกขั้นต่ำ', 'สต็อกสูงสุด', 'หน่วย', 'สถานะ', 'แจ้งเตือน', 'มูลค่าสต็อก', 'ยอดขาย 30 วัน', 'หมวดหมู่'];
   const sampleData = [
     ['P002', 'อาหารเม็ดสุนัข 1 กก.', '15', '5', '50', 'ถุง', 'ปกติ', 'ไม่ต้องเติม', '4200', '45', 'อาหารสัตว์'],
@@ -281,7 +381,10 @@ function createInventorySheet(spreadsheet) {
  * Create Appointments sheet
  */
 function createAppointmentsSheet(spreadsheet) {
+  Logger.log('=== createAppointmentsSheet() called ===');
+  Logger.log('Spreadsheet ID: ' + spreadsheet.getId());
   const sheet = spreadsheet.insertSheet('นัดหมาย');
+  Logger.log('Appointments sheet created: ' + sheet.getName());
   const headers = ['วันที่', 'เวลา', 'รหัสลูกค้า', 'ชื่อลูกค้า', 'เบอร์โทร', 'บริการ', 'สถานะ', 'พนักงาน', 'หมายเหตุ', 'ยืนยัน', 'ยกเลิก'];
   const sampleData = [
     ['2024-01-16', '10:00', 'C001', 'คุณโบ', '081-234-5678', 'อาบน้ำ+ตัดขน', 'จองแล้ว', 'พี่แอน', '', '✓', ''],
@@ -298,19 +401,32 @@ function createAppointmentsSheet(spreadsheet) {
  * Format sheet header row
  */
 function formatSheetHeader(sheet, row, numColumns) {
+  Logger.log('=== formatSheetHeader() called ===');
+  Logger.log('Sheet: ' + sheet.getName() + ', Row: ' + row + ', Columns: ' + numColumns);
   const range = sheet.getRange(row, 1, 1, numColumns);
+  Logger.log('Setting font weight to bold');
   range.setFontWeight('bold');
+  Logger.log('Setting background color: #8b7355');
   range.setBackground('#8b7355');
+  Logger.log('Setting font color: #ffffff');
   range.setFontColor('#ffffff');
+  Logger.log('Setting horizontal alignment to center');
   range.setHorizontalAlignment('center');
+  Logger.log('=== formatSheetHeader() completed ===');
 }
 
 /**
  * Send email notification
  */
 function sendEmailNotification(data, templateSpreadsheetId) {
+  Logger.log('=== sendEmailNotification() called ===');
+  Logger.log('Recipient: ' + NOTIFICATION_EMAIL);
+  Logger.log('Business name: ' + (data.businessName || 'Unknown'));
+  Logger.log('Template spreadsheet ID: ' + (templateSpreadsheetId || 'null'));
+  
   try {
     const subject = '🎉 New Lead Submitted - ' + (data.businessName || 'Unknown Business');
+    Logger.log('Email subject: ' + subject);
     
     const htmlBody = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -384,14 +500,20 @@ Template Spreadsheet Created for User: https://docs.google.com/spreadsheets/d/${
 ` : ''}
     `;
     
+    Logger.log('Sending email to: ' + NOTIFICATION_EMAIL);
     MailApp.sendEmail({
       to: NOTIFICATION_EMAIL,
       subject: subject,
       htmlBody: htmlBody,
       body: plainBody
     });
+    Logger.log('Email sent successfully');
+    Logger.log('=== sendEmailNotification() completed successfully ===');
     
   } catch (error) {
+    Logger.log('=== ERROR in sendEmailNotification() ===');
+    Logger.log('Error message: ' + error.toString());
+    Logger.log('Error stack: ' + (error.stack || 'No stack trace'));
     console.error('Error sending email:', error);
     // Don't fail the whole request if email fails
   }
@@ -401,8 +523,14 @@ Template Spreadsheet Created for User: https://docs.google.com/spreadsheets/d/${
  * Send template spreadsheet link to user
  */
 function sendTemplateEmailToUser(leadData, templateSpreadsheetId) {
+  Logger.log('=== sendTemplateEmailToUser() called ===');
+  Logger.log('Recipient: ' + (leadData.email || 'N/A'));
+  Logger.log('Template spreadsheet ID: ' + templateSpreadsheetId);
+  Logger.log('Contact name: ' + (leadData.contactName || 'N/A'));
+  
   try {
     const subject = '📊 Template Google Sheets ของคุณพร้อมใช้งานแล้ว!';
+    Logger.log('Email subject: ' + subject);
     
     const businessTypeNames = {
       'pet': 'Pet Shop',
@@ -487,14 +615,20 @@ https://docs.google.com/spreadsheets/d/${templateSpreadsheetId}/edit
 ทีม AI Smart Backoffice
     `;
     
+    Logger.log('Sending email to user: ' + leadData.email);
     MailApp.sendEmail({
       to: leadData.email,
       subject: subject,
       htmlBody: htmlBody,
       body: plainBody
     });
+    Logger.log('User email sent successfully');
+    Logger.log('=== sendTemplateEmailToUser() completed successfully ===');
     
   } catch (error) {
+    Logger.log('=== ERROR in sendTemplateEmailToUser() ===');
+    Logger.log('Error message: ' + error.toString());
+    Logger.log('Error stack: ' + (error.stack || 'No stack trace'));
     console.error('Error sending template email to user:', error);
     // Don't fail the whole request if email fails
   }

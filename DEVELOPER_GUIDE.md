@@ -91,11 +91,15 @@ This is a demo website for an AI-powered backoffice system that integrates with 
 ```
 Web Demo/
 │
-├── index.html                 # Main frontend file
-├── google-apps-script.js      # Backend Google Apps Script
-├── SETUP_INSTRUCTIONS.md     # Setup guide for deployment
-├── USER_DEMO_GUIDE.md        # User-facing guide
-└── DEVELOPER_GUIDE.md        # This file
+├── index.html                      # Main frontend file
+├── google-apps-script.js           # Demo/Lead collection script (standalone)
+├── CONTAINER_BOUND_SCRIPT.js        # Production script (container-bound, per customer)
+├── SETUP_INSTRUCTIONS.md           # Setup guide for deployment
+├── USER_DEMO_GUIDE.md              # User-facing guide
+├── DEVELOPER_GUIDE.md              # This file
+├── CUSTOMER_ONBOARDING_GUIDE.md    # Production scaling guide
+├── CLOUDFLARE_DEPLOYMENT.md        # Cloudflare Pages deployment guide
+└── OPENSPEC.md                     # Project specification and requirements
 ```
 
 ### File Descriptions
@@ -109,8 +113,10 @@ Web Demo/
   - JavaScript logic (lines 953-1659)
 
 #### `google-apps-script.js`
-- **Purpose**: Server-side logic for Google Apps Script
+- **Purpose**: Demo/Lead collection script (standalone Web App)
 - **Size**: ~503 lines
+- **Usage**: For demo system and lead collection
+- **Architecture**: Standalone script with hardcoded SPREADSHEET_ID
 - **Functions**:
   - `doPost()` - Handles form submissions
   - `doGet()` - Health check endpoint
@@ -118,6 +124,18 @@ Web Demo/
   - `sendEmailNotification()` - Sends admin emails
   - `sendTemplateEmailToUser()` - Sends user emails
   - Sheet creation functions (6 functions)
+
+#### `CONTAINER_BOUND_SCRIPT.js`
+- **Purpose**: Production script for customer-specific sheets
+- **Size**: ~256 lines
+- **Usage**: Embedded in each customer's Google Sheet
+- **Architecture**: Container-bound script using `getActiveSpreadsheet()`
+- **Benefits**: Data isolation, customer ownership, scalable
+- **Functions**:
+  - `doPost()` - Handles form submissions
+  - `doGet()` - Health check endpoint
+  - `saveDataToSheet()` - Saves data to customer's Sheet
+  - `sendEmailNotification()` - Sends admin emails
 
 ---
 
@@ -136,11 +154,12 @@ Web Demo/
 ```bash
 # Clone or download the project
 cd "Web Demo"
-
-# Open index.html in a code editor
-# Update the Google Apps Script URL (line ~1539)
-const GOOGLE_SCRIPT_URL = 'YOUR_ACTUAL_WEB_APP_URL';
 ```
+
+**Note**: The frontend now supports dynamic API endpoints via URL parameter:
+- Demo mode: Use default URL (no parameter needed)
+- Production mode: Use `?api=SCRIPT_URL` parameter
+- See `SETUP_INSTRUCTIONS.md` for detailed setup
 
 #### 2. Google Apps Script Setup
 

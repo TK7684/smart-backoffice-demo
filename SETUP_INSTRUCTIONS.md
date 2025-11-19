@@ -32,15 +32,20 @@ This setup allows your lead form to automatically save submissions to Google She
    https://script.google.com/macros/s/AKfycby.../exec
    ```
 
-## Step 3: Update HTML File
+## Step 3: Configure Frontend (Optional for Demo)
 
-1. Open `index.html`
-2. Find this line (around line 1539):
-   ```javascript
-   const GOOGLE_SCRIPT_URL = 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL_HERE';
-   ```
-3. Replace `'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL_HERE'` with your actual Web App URL from Step 2
-4. Save the file
+The frontend now supports dynamic API endpoints. You have two options:
+
+### Option A: Use Default Demo URL (Recommended for Testing)
+- No changes needed! The frontend uses a default demo URL automatically.
+- Just deploy `index.html` and it will work.
+
+### Option B: Use Your Own Script URL
+- The frontend reads the API URL from the `?api=` URL parameter
+- Users can access: `yourwebsite.com?api=YOUR_WEB_APP_URL`
+- Or update the `DEMO_SCRIPT_URL` constant in `index.html` (around line 1568) if you want a different default
+
+**Note**: For production scaling with multiple customers, see `CUSTOMER_ONBOARDING_GUIDE.md`
 
 ## Step 4: Test
 
@@ -54,10 +59,11 @@ This setup allows your lead form to automatically save submissions to Google She
 ## Troubleshooting
 
 ### Data not saving to Google Sheets
-- Verify the Web App URL is correct in `index.html`
+- If using `?api=` parameter, verify the URL is correct
 - Check that the script is deployed and set to "Anyone" can access
 - Open the Apps Script editor and check "Executions" tab for errors
-- Verify the Spreadsheet ID is correct
+- Verify the Spreadsheet ID is correct (for `google-apps-script.js`)
+- Check browser console for API errors
 
 ### Email not received
 - Check spam folder
