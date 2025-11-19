@@ -1,0 +1,1658 @@
+<!DOCTYPE html>
+<html lang="th">
+  <head>
+    <meta charset="UTF-8" />
+    <title>AI Smart Backoffice Demo | Google Sheets + AI</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+      /* ====== Reset & Base ====== */
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+          sans-serif;
+        background: #f5f1e8;
+        color: #3e2723;
+        min-height: 100vh;
+        display: flex;
+        justify-content: center;
+        padding: 16px;
+      }
+
+      /* ====== Layout ====== */
+      .app-container {
+        width: 100%;
+        max-width: 1200px;
+        background: linear-gradient(to bottom, #faf8f3, #f5f1e8);
+        border-radius: 24px;
+        padding: 20px 20px 24px;
+        box-shadow: 0 8px 24px rgba(101, 67, 33, 0.15);
+        border: 1px solid rgba(139, 115, 85, 0.2);
+      }
+
+      .header {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        align-items: center;
+        margin-bottom: 20px;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .brand-logo {
+        width: 40px;
+        height: 40px;
+        border-radius: 999px;
+        background: linear-gradient(135deg, #8b7355, #6b5d4f, #8b7355);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #faf8f3;
+        font-weight: 800;
+        font-size: 20px;
+        box-shadow: 0 2px 8px rgba(101, 67, 33, 0.2);
+      }
+
+      .brand-title {
+        font-size: 18px;
+        font-weight: 700;
+        color: #5d4037;
+      }
+
+      .brand-subtitle {
+        font-size: 12px;
+        color: #8b7355;
+      }
+
+      .pill {
+        border-radius: 999px;
+        border: 1px solid rgba(139, 115, 85, 0.4);
+        padding: 6px 12px;
+        font-size: 12px;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        color: #5d4037;
+        background: rgba(255, 255, 255, 0.6);
+      }
+
+      .pill-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        background: #689f38;
+        box-shadow: 0 0 6px rgba(104, 159, 56, 0.5);
+      }
+
+      /* ====== Controls ====== */
+      .controls {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-bottom: 16px;
+      }
+
+      .segment {
+        background: rgba(255, 255, 255, 0.6);
+        border-radius: 999px;
+        padding: 4px;
+        display: inline-flex;
+        gap: 4px;
+        border: 1px solid rgba(139, 115, 85, 0.4);
+      }
+
+      .segment button {
+        border: none;
+        border-radius: 999px;
+        padding: 6px 12px;
+        font-size: 12px;
+        background: transparent;
+        color: #8b7355;
+        cursor: pointer;
+        transition: all 0.15s ease;
+      }
+
+      .segment button.active {
+        background: linear-gradient(to right, #8b7355, #6b5d4f);
+        color: #faf8f3;
+        font-weight: 600;
+      }
+
+      .badge {
+        padding: 4px 8px;
+        border-radius: 999px;
+        font-size: 11px;
+        border: 1px solid rgba(139, 115, 85, 0.5);
+        color: #5d4037;
+        background: rgba(255, 255, 255, 0.5);
+      }
+
+      .btn-template-badge {
+        padding: 8px 16px;
+        border-radius: 999px;
+        font-size: 12px;
+        border: 1px solid rgba(139, 115, 85, 0.5);
+        color: #5d4037;
+        background: linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(250, 248, 243, 0.9));
+        cursor: pointer;
+        font-weight: 600;
+        transition: all 0.2s ease;
+        box-shadow: 0 2px 6px rgba(101, 67, 33, 0.1);
+      }
+
+      .btn-template-badge:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(101, 67, 33, 0.2);
+        background: linear-gradient(135deg, rgba(255, 255, 255, 1), rgba(250, 248, 243, 1));
+      }
+
+      /* ====== Modal ====== */
+      .modal-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+      }
+
+      .modal-overlay.active {
+        display: flex;
+      }
+
+      .modal {
+        background: #faf8f3;
+        border-radius: 20px;
+        padding: 24px;
+        max-width: 600px;
+        width: 100%;
+        max-height: 90vh;
+        overflow-y: auto;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        border: 1px solid rgba(139, 115, 85, 0.3);
+      }
+
+      .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        padding-bottom: 12px;
+        border-bottom: 1px solid rgba(139, 115, 85, 0.2);
+      }
+
+      .modal-title {
+        font-size: 18px;
+        font-weight: 700;
+        color: #5d4037;
+      }
+
+      .modal-close {
+        background: none;
+        border: none;
+        font-size: 24px;
+        color: #8b7355;
+        cursor: pointer;
+        padding: 0;
+        width: 30px;
+        height: 30px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        transition: all 0.2s ease;
+      }
+
+      .modal-close:hover {
+        background: rgba(139, 115, 85, 0.1);
+        color: #5d4037;
+      }
+
+      .form-group {
+        margin-bottom: 16px;
+      }
+
+      .form-label {
+        display: block;
+        font-size: 13px;
+        font-weight: 600;
+        color: #5d4037;
+        margin-bottom: 6px;
+      }
+
+      .form-input {
+        width: 100%;
+        padding: 10px 12px;
+        border-radius: 10px;
+        border: 1px solid rgba(139, 115, 85, 0.3);
+        background: rgba(255, 255, 255, 0.9);
+        font-size: 13px;
+        color: #3e2723;
+        transition: all 0.2s ease;
+      }
+
+      .form-input:focus {
+        outline: none;
+        border-color: #8b7355;
+        box-shadow: 0 0 0 3px rgba(139, 115, 85, 0.1);
+      }
+
+      .form-select {
+        width: 100%;
+        padding: 10px 12px;
+        border-radius: 10px;
+        border: 1px solid rgba(139, 115, 85, 0.3);
+        background: rgba(255, 255, 255, 0.9);
+        font-size: 13px;
+        color: #3e2723;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+
+      .form-select:focus {
+        outline: none;
+        border-color: #8b7355;
+        box-shadow: 0 0 0 3px rgba(139, 115, 85, 0.1);
+      }
+
+      .btn-submit {
+        width: 100%;
+        padding: 12px;
+        border-radius: 12px;
+        border: none;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        background: linear-gradient(135deg, #8b7355, #6b5d4f);
+        color: #faf8f3;
+        transition: all 0.2s ease;
+        margin-top: 8px;
+      }
+
+      .btn-submit:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(101, 67, 33, 0.3);
+      }
+
+      .btn-submit:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        transform: none;
+      }
+
+      /* ====== Template Preview ====== */
+      .template-preview {
+        display: none;
+        margin-top: 20px;
+        padding: 16px;
+        background: rgba(255, 255, 255, 0.8);
+        border-radius: 12px;
+        border: 1px solid rgba(139, 115, 85, 0.2);
+      }
+
+      .template-preview.active {
+        display: block;
+      }
+
+      .template-tabs {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 12px;
+        flex-wrap: wrap;
+      }
+
+      .template-tab {
+        padding: 6px 12px;
+        border-radius: 8px;
+        border: 1px solid rgba(139, 115, 85, 0.3);
+        background: rgba(255, 255, 255, 0.6);
+        color: #5d4037;
+        font-size: 12px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+
+      .template-tab.active {
+        background: #8b7355;
+        color: #faf8f3;
+        border-color: #8b7355;
+      }
+
+      .template-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 11px;
+        background: white;
+        border-radius: 8px;
+        overflow: hidden;
+      }
+
+      .template-table th {
+        background: rgba(139, 115, 85, 0.2);
+        padding: 8px;
+        text-align: left;
+        font-weight: 600;
+        color: #5d4037;
+        border-bottom: 2px solid rgba(139, 115, 85, 0.3);
+      }
+
+      .template-table td {
+        padding: 6px 8px;
+        border-bottom: 1px solid rgba(139, 115, 85, 0.1);
+        color: #3e2723;
+      }
+
+      .template-table tr:last-child td {
+        border-bottom: none;
+      }
+
+      .template-note {
+        margin-top: 12px;
+        padding: 10px;
+        background: rgba(104, 159, 56, 0.1);
+        border-radius: 8px;
+        border-left: 3px solid #689f38;
+        font-size: 12px;
+        color: #5d4037;
+      }
+
+      /* ====== Grid Layout ====== */
+      .grid {
+        display: grid;
+        grid-template-columns: 2.2fr 1.2fr;
+        gap: 16px;
+      }
+
+      @media (max-width: 900px) {
+        .grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      /* ====== Cards ====== */
+      .card {
+        background: rgba(255, 255, 255, 0.8);
+        border-radius: 18px;
+        padding: 14px 16px 16px;
+        border: 1px solid rgba(139, 115, 85, 0.2);
+        box-shadow: 0 2px 8px rgba(101, 67, 33, 0.08);
+      }
+
+      .card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 8px;
+      }
+
+      .card-title {
+        font-size: 14px;
+        font-weight: 600;
+        color: #5d4037;
+      }
+
+      .card-subtitle {
+        font-size: 11px;
+        color: #8b7355;
+      }
+
+      .chart-container {
+        margin-top: 12px;
+        padding: 8px;
+        background: rgba(255, 255, 255, 0.5);
+        border-radius: 12px;
+        height: 200px;
+        position: relative;
+      }
+
+      /* ====== Metrics ====== */
+      .metrics-row {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+        margin-bottom: 12px;
+      }
+
+      @media (max-width: 640px) {
+        .metrics-row {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .metric {
+        background: linear-gradient(to bottom, rgba(255, 255, 255, 0.9), rgba(250, 248, 243, 0.9));
+        border-radius: 14px;
+        padding: 10px 12px;
+        border: 1px solid rgba(139, 115, 85, 0.3);
+        box-shadow: 0 2px 6px rgba(101, 67, 33, 0.1);
+      }
+
+      .metric-label {
+        font-size: 11px;
+        color: #8b7355;
+        margin-bottom: 4px;
+      }
+
+      .metric-value {
+        font-size: 16px;
+        font-weight: 700;
+        margin-bottom: 3px;
+        color: #5d4037;
+      }
+
+      .metric-trend {
+        font-size: 11px;
+      }
+
+      .trend-up {
+        color: #689f38;
+      }
+
+      .trend-down {
+        color: #d84315;
+      }
+
+      /* ====== Table ====== */
+      .table-wrapper {
+        margin-top: 4px;
+        border-radius: 12px;
+        border: 1px solid rgba(139, 115, 85, 0.2);
+        overflow: hidden;
+        background: rgba(255, 255, 255, 0.6);
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 11px;
+      }
+
+      thead {
+        background: rgba(139, 115, 85, 0.15);
+      }
+
+      th,
+      td {
+        padding: 6px 8px;
+        text-align: left;
+      }
+
+      th {
+        font-weight: 500;
+        color: #5d4037;
+        border-bottom: 1px solid rgba(139, 115, 85, 0.3);
+      }
+
+      td {
+        color: #3e2723;
+      }
+
+      tbody tr:nth-child(even) {
+        background: rgba(250, 248, 243, 0.5);
+      }
+
+      tbody tr:nth-child(odd) {
+        background: rgba(255, 255, 255, 0.3);
+      }
+
+      tbody tr:hover {
+        background: rgba(139, 115, 85, 0.1);
+      }
+
+      .status-pill {
+        padding: 2px 6px;
+        border-radius: 999px;
+        font-size: 10px;
+        border: 1px solid rgba(139, 115, 85, 0.5);
+      }
+
+      .status-done {
+        border-color: #689f38;
+        color: #558b2f;
+        background: rgba(104, 159, 56, 0.1);
+      }
+
+      .status-pending {
+        border-color: #f57c00;
+        color: #e65100;
+        background: rgba(245, 124, 0, 0.1);
+      }
+
+      /* ====== List ====== */
+      .list {
+        list-style: none;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        margin-top: 6px;
+      }
+
+      .list-item {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        align-items: flex-start;
+        padding: 6px 8px;
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.6);
+        border: 1px solid rgba(139, 115, 85, 0.2);
+      }
+
+      .list-text {
+        font-size: 11px;
+        color: #3e2723;
+      }
+
+      .list-tag {
+        font-size: 10px;
+        padding: 2px 6px;
+        border-radius: 999px;
+        border: 1px solid rgba(139, 115, 85, 0.5);
+        white-space: nowrap;
+        color: #5d4037;
+        background: rgba(255, 255, 255, 0.5);
+      }
+
+      /* ====== Chat ====== */
+      .chat-window {
+        background: linear-gradient(to bottom, rgba(255, 255, 255, 0.9), rgba(250, 248, 243, 0.9));
+        border-radius: 14px;
+        border: 1px solid rgba(139, 115, 85, 0.3);
+        padding: 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        height: 260px;
+        box-shadow: 0 2px 8px rgba(101, 67, 33, 0.1);
+      }
+
+      .chat-messages {
+        flex: 1;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        padding-right: 4px;
+      }
+
+      .bubble {
+        max-width: 78%;
+        padding: 6px 8px;
+        border-radius: 10px;
+        font-size: 11px;
+        line-height: 1.35;
+      }
+
+      .bubble.user {
+        background: linear-gradient(135deg, #8b7355, #6b5d4f);
+        color: #faf8f3;
+        align-self: flex-end;
+        border-bottom-right-radius: 2px;
+      }
+
+      .bubble.bot {
+        background: rgba(255, 255, 255, 0.8);
+        border: 1px solid rgba(139, 115, 85, 0.3);
+        color: #3e2723;
+        align-self: flex-start;
+        border-bottom-left-radius: 2px;
+      }
+
+      .chat-input-row {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+      }
+
+      .chat-input {
+        flex: 1;
+        border-radius: 999px;
+        border: 1px solid rgba(139, 115, 85, 0.3);
+        background: rgba(255, 255, 255, 0.9);
+        padding: 6px 10px;
+        font-size: 11px;
+        color: #3e2723;
+      }
+
+      .chat-input:focus {
+        outline: none;
+        border-color: #8b7355;
+      }
+
+      .chat-btn {
+        border-radius: 999px;
+        border: none;
+        padding: 6px 10px;
+        font-size: 11px;
+        cursor: pointer;
+        background: linear-gradient(to right, #8b7355, #6b5d4f);
+        color: #faf8f3;
+        font-weight: 600;
+      }
+
+      .chat-btn:hover {
+        opacity: 0.9;
+      }
+
+      .chat-quick {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+
+      .chat-quick button {
+        border-radius: 999px;
+        border: 1px solid rgba(139, 115, 85, 0.3);
+        background: rgba(255, 255, 255, 0.7);
+        padding: 4px 8px;
+        font-size: 10px;
+        color: #5d4037;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+
+      .chat-quick button:hover {
+        background: rgba(139, 115, 85, 0.1);
+        border-color: #8b7355;
+      }
+
+      /* ====== Footer ====== */
+      .footer {
+        margin-top: 20px;
+        padding-top: 16px;
+        border-top: 1px solid rgba(139, 115, 85, 0.2);
+        font-size: 12px;
+        color: #8b7355;
+        display: flex;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .footer-contact {
+        width: 100%;
+        text-align: center;
+        margin-top: 12px;
+        padding: 12px;
+        background: rgba(255, 255, 255, 0.6);
+        border-radius: 12px;
+        border: 1px solid rgba(139, 115, 85, 0.2);
+        font-size: 13px;
+        color: #5d4037;
+        font-weight: 500;
+      }
+
+      .email-link {
+        color: #689f38;
+        text-decoration: none;
+        font-weight: 600;
+        transition: all 0.2s ease;
+      }
+
+      .email-link:hover {
+        color: #558b2f;
+        text-decoration: underline;
+      }
+
+      .highlight {
+        color: #689f38;
+        font-weight: 600;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app-container">
+      <!-- Header -->
+      <header class="header">
+        <div class="brand">
+          <div class="brand-logo">AI</div>
+          <div>
+            <div class="brand-title">AI Smart Backoffice Demo</div>
+            <div class="brand-subtitle">
+              ตัวอย่างระบบหลังบ้านด้วย Google Sheets + AI สำหรับร้านค้า/SME
+            </div>
+          </div>
+        </div>
+        <div>
+          <div class="pill">
+            <span class="pill-dot"></span>
+            <span>เชื่อมต่อข้อมูลจริงได้เมื่อติดตั้งแพ็กเกจเต็ม</span>
+          </div>
+        </div>
+      </header>
+
+      <!-- Controls -->
+      <section class="controls">
+        <div>
+          <div style="font-size: 11px; color: #8b7355; margin-bottom: 4px">
+            ประเภทร้านค้า
+          </div>
+          <div class="segment">
+            <button class="active" data-shop-type="pet">Pet Shop</button>
+            <button data-shop-type="food">ร้านอาหาร</button>
+            <button data-shop-type="salon">ร้านเสริมสวย</button>
+          </div>
+        </div>
+        <div>
+          <button class="btn-template-badge" id="btn-demo-template">Demo Template แจกฟรี</button>
+        </div>
+      </section>
+
+      <!-- Grid -->
+      <section class="grid">
+        <!-- Left: Dashboard -->
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">ภาพรวมวันนี้</div>
+              <div class="card-subtitle">
+                ข้อมูลตัวอย่าง (Mock Data) - เวอร์ชันเต็มเชื่อม Google Sheets จริง
+              </div>
+            </div>
+            <div class="badge">Dashboard</div>
+          </div>
+
+          <!-- Metrics -->
+          <div class="metrics-row">
+            <div class="metric" id="metric-sales">
+              <div class="metric-label">ยอดขายวันนี้ (ประมาณการ)</div>
+              <div class="metric-value"></div>
+              <div class="metric-trend"></div>
+            </div>
+            <div class="metric" id="metric-orders">
+              <div class="metric-label">จำนวนออเดอร์วันนี้</div>
+              <div class="metric-value"></div>
+              <div class="metric-trend"></div>
+            </div>
+            <div class="metric" id="metric-profit">
+              <div class="metric-label">กำไรโดยประมาณ</div>
+              <div class="metric-value"></div>
+              <div class="metric-trend"></div>
+            </div>
+          </div>
+
+          <!-- Sales Chart -->
+          <div class="card-header" style="margin-top: 12px">
+            <div class="card-title">กราฟยอดขาย 7 วันล่าสุด</div>
+            <div class="card-subtitle">ข้อมูลตัวอย่างจาก Google Sheets</div>
+          </div>
+          <div class="chart-container">
+            <canvas id="salesChart"></canvas>
+          </div>
+
+          <!-- Orders Table -->
+          <div class="card-header" style="margin-top: 8px">
+            <div class="card-title">ออเดอร์ล่าสุด</div>
+            <div class="card-subtitle">ตัวอย่างรูปแบบการบันทึกลง Google Sheets</div>
+          </div>
+
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>เวลา</th>
+                  <th>ลูกค้า</th>
+                  <th>รายละเอียด</th>
+                  <th>ยอดรวม</th>
+                  <th>สถานะ</th>
+                </tr>
+              </thead>
+              <tbody id="orders-body"></tbody>
+            </table>
+          </div>
+
+          <!-- Alerts -->
+          <div class="card-header" style="margin-top: 10px">
+            <div class="card-title">แจ้งเตือนสำคัญ</div>
+            <div class="card-subtitle">
+              ตัวอย่างแจ้งเตือนสต็อก / คิวลูกค้า / วัคซีน / วัตถุดิบ
+            </div>
+          </div>
+
+          <ul class="list" id="alerts-list"></ul>
+        </div>
+
+        <!-- Right: AI Chat & Info -->
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">AI Chat Demo</div>
+              <div class="card-subtitle">
+                ตัวอย่างหน้าตาระบบตอบลูกค้าอัตโนมัติ (ฝั่งหน้าเว็บ)
+              </div>
+            </div>
+            <div class="badge">AI Assistant</div>
+          </div>
+
+          <div class="chat-window">
+            <div class="chat-messages" id="chat-messages">
+              <div class="bubble bot">
+                สวัสดีค่ะ 👋 ยินดีต้อนรับสู่เดโม่ระบบ AI สำหรับร้านค้า
+                สามารถกดปุ่มคำถามตัวอย่างด้านล่าง หรือพิมพ์ถามได้เลยค่ะ
+              </div>
+            </div>
+            <div class="chat-quick">
+              <button data-q="วันนี้ขายได้เท่าไหร่?">วันนี้ขายได้เท่าไหร่?</button>
+              <button data-q="มีของอะไรใกล้หมดบ้าง?">มีของอะไรใกล้หมดบ้าง?</button>
+              <button data-q="คิวลูกค้าตอนนี้?">คิวลูกค้าตอนนี้?</button>
+            </div>
+            <div class="chat-input-row">
+              <input
+                id="chat-input"
+                class="chat-input"
+                placeholder="พิมพ์คำถาม เช่น ยอดขายวันนี้ / สต็อกใกล้หมด / จองคิว..."
+              />
+              <button class="chat-btn" id="chat-send">ส่ง</button>
+            </div>
+          </div>
+
+          <div style="margin-top: 10px; font-size: 11px; color: #9ca3af">
+            🔍 <span class="highlight">เดโม่นี้ใช้ข้อมูลจำลอง</span> –
+            เวอร์ชันใช้งานจริงสามารถ:
+            <ul style="margin-top: 4px; padding-left: 16px; list-style: disc">
+              <li>เชื่อมต่อ Google Sheets / BigQuery / ระบบร้านค้า</li>
+              <li>คำนวนต้นทุน–กำไรอัตโนมัติ</li>
+              <li>แจ้งเตือนผ่าน LINE / Email ได้</li>
+              <li>ปรับแต่งให้เข้ากับรูปแบบธุรกิจของคุณ</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- Footer -->
+      <footer class="footer">
+        <div>
+          ตัวอย่างเทมเพลต: <span class="highlight">AI Setup สำหรับร้านค้า/SME</span>
+        </div>
+        <div>เวอร์ชันเต็ม: ระบบเชื่อม Google Sheets + AI + LINE OA แบบครบวงจร</div>
+        <div class="footer-contact">
+          <a href="mailto:tripetkk@gmail.com" class="email-link">ถ้าอยากให้เชื่อมกับ Google Sheets จริง ส่งอีเมลมาได้เลย</a>
+        </div>
+      </footer>
+    </div>
+
+    <!-- Lead Collection Modal -->
+    <div class="modal-overlay" id="lead-modal">
+      <div class="modal">
+        <div class="modal-header">
+          <div class="modal-title">กรอกข้อมูลเพื่อรับ Free Template</div>
+          <button class="modal-close" id="modal-close">&times;</button>
+        </div>
+        <form id="lead-form">
+          <div class="form-group">
+            <label class="form-label">ชื่อธุรกิจ *</label>
+            <input type="text" class="form-input" name="businessName" required placeholder="เช่น ร้านขายของชำ ABC" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">ประเภทธุรกิจ *</label>
+            <select class="form-select" name="businessType" required>
+              <option value="">เลือกประเภทธุรกิจ</option>
+              <option value="pet">Pet Shop</option>
+              <option value="food">ร้านอาหาร</option>
+              <option value="salon">ร้านเสริมสวย</option>
+              <option value="retail">ร้านค้าปลีก</option>
+              <option value="service">บริการ</option>
+              <option value="other">อื่นๆ</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">ชื่อผู้ติดต่อ *</label>
+            <input type="text" class="form-input" name="contactName" required placeholder="ชื่อ-นามสกุล" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">อีเมล *</label>
+            <input type="email" class="form-input" name="email" required placeholder="example@email.com" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">เบอร์โทรศัพท์ *</label>
+            <input type="tel" class="form-input" name="phone" required placeholder="08X-XXX-XXXX" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">LINE ID (ถ้ามี)</label>
+            <input type="text" class="form-input" name="lineId" placeholder="@lineid หรือ 08X-XXX-XXXX" />
+          </div>
+          <button type="submit" class="btn-submit" id="submit-btn">ส่งข้อมูล</button>
+        </form>
+        <div class="template-preview" id="template-preview">
+          <div style="margin-bottom: 12px; font-weight: 600; color: #5d4037; font-size: 14px;">
+            📊 Google Sheets Template สำหรับคุณ
+          </div>
+          <div class="template-tabs" id="template-tabs">
+            <div class="template-tab active" data-tab="orders">ออเดอร์</div>
+            <div class="template-tab" data-tab="products">สินค้า/บริการ</div>
+            <div class="template-tab" data-tab="customers">ลูกค้า</div>
+            <div class="template-tab" data-tab="analytics">วิเคราะห์</div>
+            <div class="template-tab" data-tab="inventory">สต็อก</div>
+            <div class="template-tab" data-tab="appointments">นัดหมาย</div>
+          </div>
+          <div id="template-content">
+            <!-- Template content will be inserted here -->
+          </div>
+          <div class="template-note">
+            💡 <strong>หมายเหตุ:</strong> หลังจากส่งข้อมูลแล้ว ระบบจะสร้าง Google Sheets Template พร้อมใช้งานให้คุณอัตโนมัติ
+            และส่งลิงก์ไปยังอีเมลของคุณ คุณสามารถแก้ไขข้อมูลใน Template ได้เลย
+            ระบบจะเชื่อมต่อและอัปเดตข้อมูลอัตโนมัติเมื่อคุณติดตั้งแพ็กเกจเต็ม
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // ===== Mock Data per shop type =====
+      const DATA = {
+        pet: {
+          metrics: {
+            sales: { value: "12,450 ฿", trend: "+18% vs เมื่อวาน" },
+            orders: { value: "24 ออเดอร์", trend: "5 ออเดอร์จากลูกค้าใหม่" },
+            profit: { value: "4,980 ฿", trend: "+12% กำไรสุทธิ" },
+          },
+          chartData: {
+            labels: ["6 วันที่แล้ว", "5 วันที่แล้ว", "4 วันที่แล้ว", "3 วันที่แล้ว", "2 วันที่แล้ว", "เมื่อวาน", "วันนี้"],
+            sales: [8500, 9200, 10800, 11200, 10500, 11800, 12450],
+          },
+          orders: [
+            {
+              time: "10:15",
+              customer: "คุณโบ",
+              detail: "อาบน้ำ+ตัดขน + ขนมสุนัข",
+              total: "890 ฿",
+              status: "เสร็จแล้ว",
+            },
+            {
+              time: "11:40",
+              customer: "คุณแป้ง",
+              detail: "อาหารเม็ด 3 กก. + ทรีต",
+              total: "1,250 ฿",
+              status: "จัดส่ง",
+            },
+            {
+              time: "13:05",
+              customer: "คุณฟ้า",
+              detail: "ฝากเลี้ยง 1 วัน (L)",
+              total: "750 ฿",
+              status: "เช็คอินแล้ว",
+            },
+            {
+              time: "14:30",
+              customer: "คุณโอ",
+              detail: "วัคซีนรวมสุนัข + ตรวจสุขภาพ",
+              total: "1,500 ฿",
+              status: "รอตรวจ",
+            },
+            {
+              time: "15:20",
+              customer: "คุณมิ้ง",
+              detail: "ขนมแมว + ของเล่น",
+              total: "450 ฿",
+              status: "เสร็จแล้ว",
+            },
+            {
+              time: "16:10",
+              customer: "คุณตูน",
+              detail: "อาบน้ำสุนัข 2 ตัว",
+              total: "600 ฿",
+              status: "กำลังทำ",
+            },
+          ],
+          alerts: [
+            {
+              text: "อาหารเม็ดสูตรสุนัขเล็ก 1 กก. เหลือ 4 ถุง (ต่ำกว่าระดับเตือน)",
+              tag: "สต็อกใกล้หมด",
+            },
+            {
+              text: "น้องลูคัส – กำหนดฉีดวัคซีนครั้งถัดไปวันนี้ 18:00 น.",
+              tag: "วัคซีน",
+            },
+            {
+              text: "มีนัดอาบน้ำสุนัข 5 คิว เวลา 15:00–17:00 น.",
+              tag: "จองคิว",
+            },
+            {
+              text: "ลูกค้าสมาชิก 3 คน มีคะแนนสะสมใกล้หมดอายุใน 7 วัน",
+              tag: "โปรโมชั่น",
+            },
+          ],
+        },
+        food: {
+          metrics: {
+            sales: { value: "18,320 ฿", trend: "+25% ช่วงกลางวัน" },
+            orders: { value: "56 ออเดอร์", trend: "32 ออเดอร์จากเดลิเวอรี่" },
+            profit: { value: "6,740 ฿", trend: "+9% เทียบเมื่อวาน" },
+          },
+          chartData: {
+            labels: ["6 วันที่แล้ว", "5 วันที่แล้ว", "4 วันที่แล้ว", "3 วันที่แล้ว", "2 วันที่แล้ว", "เมื่อวาน", "วันนี้"],
+            sales: [14200, 15600, 16800, 15200, 17500, 16800, 18320],
+          },
+          orders: [
+            {
+              time: "11:20",
+              customer: "Grab",
+              detail: "เซ็ตข้าวกุ้งแซ่บ x3",
+              total: "540 ฿",
+              status: "จัดส่ง",
+            },
+            {
+              time: "12:05",
+              customer: "Lineman",
+              detail: "สลัดแซลมอน + น้ำสมุนไพร",
+              total: "280 ฿",
+              status: "กำลังปรุง",
+            },
+            {
+              time: "12:45",
+              customer: "หน้าร้าน",
+              detail: "ข้าวยำทะเลรวม 2 ที่",
+              total: "380 ฿",
+              status: "เสิร์ฟแล้ว",
+            },
+            {
+              time: "13:10",
+              customer: "Robinhood",
+              detail: "กุ้งดองซีอิ๊ว + ข้าวสวย",
+              total: "320 ฿",
+              status: "รอ Rider",
+            },
+            {
+              time: "13:45",
+              customer: "Grab",
+              detail: "ต้มยำกุ้ง + ข้าวสวย x2",
+              total: "420 ฿",
+              status: "กำลังปรุง",
+            },
+            {
+              time: "14:20",
+              customer: "หน้าร้าน",
+              detail: "ข้าวผัดกุ้ง + น้ำส้ม",
+              total: "180 ฿",
+              status: "เสิร์ฟแล้ว",
+            },
+          ],
+          alerts: [
+            {
+              text: "กุ้งสด Lot เช้า เหลือ 3 กก. คาดว่าจะหมดช่วงเย็น",
+              tag: "วัตถุดิบ",
+            },
+            {
+              text: "น้ำจิ้มซีฟู้ด Batch 02/05 ใกล้ครบอายุแนะนำ",
+              tag: "คุณภาพ",
+            },
+            {
+              text: "ยอดเดลิเวอรี่เกินเป้าช่วงเที่ยง +32% จากเป้า",
+              tag: "Performance",
+            },
+            {
+              text: "เมนูข้าวกุ้งแซ่บขายดีที่สุดวันนี้ 15 ออเดอร์",
+              tag: "ยอดนิยม",
+            },
+          ],
+        },
+        salon: {
+          metrics: {
+            sales: { value: "9,780 ฿", trend: "+10% จากสัปดาห์ก่อน" },
+            orders: { value: "17 คิว", trend: "4 คิวจากลูกค้าใหม่" },
+            profit: { value: "4,200 ฿", trend: "ใช้โปรแกรมสมาชิก 6 เคส" },
+          },
+          chartData: {
+            labels: ["6 วันที่แล้ว", "5 วันที่แล้ว", "4 วันที่แล้ว", "3 วันที่แล้ว", "2 วันที่แล้ว", "เมื่อวาน", "วันนี้"],
+            sales: [8200, 8900, 8500, 9200, 8800, 9500, 9780],
+          },
+          orders: [
+            {
+              time: "10:00",
+              customer: "คุณเมย์",
+              detail: "ทำสี + ทรีตเมนต์",
+              total: "2,300 ฿",
+              status: "กำลังให้บริการ",
+            },
+            {
+              time: "11:30",
+              customer: "คุณแอน",
+              detail: "สปามือ+สปาเท้า",
+              total: "1,200 ฿",
+              status: "จบคิว",
+            },
+            {
+              time: "13:00",
+              customer: "คุณแป้ง",
+              detail: "ต่อขนตา + คิ้วโหงวเฮ้ง",
+              total: "2,800 ฿",
+              status: "จองคิว",
+            },
+            {
+              time: "14:30",
+              customer: "คุณฟาง",
+              detail: "สระไดร์ + ทรีตเมนต์เร่งด่วน",
+              total: "980 ฿",
+              status: "รอเข้าเก้าอี้",
+            },
+            {
+              time: "15:00",
+              customer: "คุณมิ้น",
+              detail: "ตัดผม + ทำสี",
+              total: "1,500 ฿",
+              status: "กำลังให้บริการ",
+            },
+            {
+              time: "16:00",
+              customer: "คุณแอม",
+              detail: "นวดหน้า + ทรีตเมนต์",
+              total: "1,000 ฿",
+              status: "จองคิว",
+            },
+          ],
+          alerts: [
+            {
+              text: "น้ำยาดัดผมสูตร Premium เหลือสำหรับ 3 เคสสุดท้าย",
+              tag: "สต็อก",
+            },
+            {
+              text: "ลูกค้าสมาชิก 5 คน มีคูปองใกล้หมดอายุใน 7 วัน",
+              tag: "การตลาด",
+            },
+            {
+              text: "บล็อกคิวแน่นช่วง 13:00–16:00 น. แนะนำปิดรับจองออนไลน์",
+              tag: "บริหารคิว",
+            },
+            {
+              text: "ลูกค้าใหม่ 4 คน สมัครโปรแกรมสมาชิกวันนี้",
+              tag: "ยอดขาย",
+            },
+          ],
+        },
+      };
+
+      // Chart instance
+      let salesChart = null;
+
+      const shopButtons = document.querySelectorAll("[data-shop-type]");
+      const metricSales = document.getElementById("metric-sales");
+      const metricOrders = document.getElementById("metric-orders");
+      const metricProfit = document.getElementById("metric-profit");
+      const ordersBody = document.getElementById("orders-body");
+      const alertsList = document.getElementById("alerts-list");
+
+      function renderShop(type) {
+        const d = DATA[type];
+
+        // Metrics
+        metricSales.querySelector(".metric-value").textContent =
+          d.metrics.sales.value;
+        metricSales.querySelector(".metric-trend").textContent =
+          d.metrics.sales.trend;
+        metricSales.querySelector(".metric-trend").className =
+          "metric-trend trend-up";
+
+        metricOrders.querySelector(".metric-value").textContent =
+          d.metrics.orders.value;
+        metricOrders.querySelector(".metric-trend").textContent =
+          d.metrics.orders.trend;
+        metricOrders.querySelector(".metric-trend").className =
+          "metric-trend trend-up";
+
+        metricProfit.querySelector(".metric-value").textContent =
+          d.metrics.profit.value;
+        metricProfit.querySelector(".metric-trend").textContent =
+          d.metrics.profit.trend;
+        metricProfit.querySelector(".metric-trend").className =
+          "metric-trend trend-up";
+
+        // Render Chart
+        renderChart(d.chartData);
+
+        // Orders table
+        ordersBody.innerHTML = "";
+        d.orders.forEach((o) => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td>${o.time}</td>
+            <td>${o.customer}</td>
+            <td>${o.detail}</td>
+            <td>${o.total}</td>
+            <td>
+              <span class="status-pill ${
+                o.status.includes("รอ") || o.status.includes("กำลัง")
+                  ? "status-pending"
+                  : "status-done"
+              }">
+                ${o.status}
+              </span>
+            </td>
+          `;
+          ordersBody.appendChild(tr);
+        });
+
+        // Alerts
+        alertsList.innerHTML = "";
+        d.alerts.forEach((a) => {
+          const li = document.createElement("li");
+          li.className = "list-item";
+          li.innerHTML = `
+            <div class="list-text">${a.text}</div>
+            <div class="list-tag">${a.tag}</div>
+          `;
+          alertsList.appendChild(li);
+        });
+      }
+
+      function renderChart(chartData) {
+        const ctx = document.getElementById("salesChart");
+        if (salesChart) {
+          salesChart.destroy();
+        }
+        salesChart = new Chart(ctx, {
+          type: "line",
+          data: {
+            labels: chartData.labels,
+            datasets: [
+              {
+                label: "ยอดขาย (บาท)",
+                data: chartData.sales,
+                borderColor: "#8b7355",
+                backgroundColor: "rgba(139, 115, 85, 0.1)",
+                borderWidth: 2,
+                fill: true,
+                tension: 0.4,
+                pointBackgroundColor: "#8b7355",
+                pointBorderColor: "#faf8f3",
+                pointBorderWidth: 2,
+                pointRadius: 4,
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: {
+                display: false,
+              },
+            },
+            scales: {
+              y: {
+                beginAtZero: true,
+                grid: {
+                  color: "rgba(139, 115, 85, 0.1)",
+                },
+                ticks: {
+                  color: "#8b7355",
+                  callback: function (value) {
+                    return value.toLocaleString() + " ฿";
+                  },
+                },
+              },
+              x: {
+                grid: {
+                  display: false,
+                },
+                ticks: {
+                  color: "#8b7355",
+                },
+              },
+            },
+          },
+        });
+      }
+
+      shopButtons.forEach((btn) => {
+        btn.addEventListener("click", () => {
+          shopButtons.forEach((b) => b.classList.remove("active"));
+          btn.classList.add("active");
+          renderShop(btn.dataset.shopType);
+        });
+      });
+
+      // Initial render
+      renderShop("pet");
+
+      // ===== Chat Demo =====
+      const chatMessages = document.getElementById("chat-messages");
+      const chatInput = document.getElementById("chat-input");
+      const chatSend = document.getElementById("chat-send");
+      const quickButtons = document.querySelectorAll(".chat-quick button");
+
+      function addBubble(text, type) {
+        const div = document.createElement("div");
+        div.className = "bubble " + type;
+        div.textContent = text;
+        chatMessages.appendChild(div);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+      }
+
+      function botReply(message) {
+        const shopType = document.querySelector(
+          ".segment button.active"
+        ).dataset.shopType;
+
+        let reply =
+          "นี่เป็นตัวอย่างเดโม่ค่ะ เวอร์ชันจริงจะดึงข้อมูลจาก Google Sheets และฐานข้อมูลของร้านคุณแบบ Real-time 🧠";
+
+        const m = message.toLowerCase();
+        if (m.includes("ขาย") || m.includes("ยอด")) {
+          if (shopType === "pet") {
+            reply = "วันนี้ Pet Shop ทำยอดขายตัวอย่าง = 12,450 บาท จาก 24 ออเดอร์ค่ะ 🐶";
+          } else if (shopType === "food") {
+            reply =
+              "วันนี้ร้านอาหารทำยอดขายตัวอย่าง = 18,320 บาท จาก 56 ออเดอร์ค่ะ 🍤";
+          } else {
+            reply =
+              "วันนี้ร้านเสริมสวยทำยอดขายตัวอย่าง = 9,780 บาท จาก 17 คิวค่ะ ✂️";
+          }
+          reply +=
+            "\n\nเวอร์ชันจริงจะคำนวณจาก Google Sheets ของคุณโดยตรง และอัปเดตอัตโนมัติ";
+        } else if (m.includes("สต็อก") || m.includes("ใกล้หมด")) {
+          reply =
+            "ตัวอย่างการแจ้งเตือนสต็อก:\n• สินค้าหลักเหลือต่ำกว่าระดับที่ตั้งค่าไว้\n• ระบบส่งแจ้งเตือนเข้า LINE ทันที\n\nคุณสามารถกำหนดขั้นต่ำ/สูงสุดแต่ละสินค้าได้ใน Google Sheets ค่ะ 📊";
+        } else if (m.includes("คิว") || m.includes("จอง")) {
+          reply =
+            "ตัวอย่างการจัดการคิว:\n• ระบบบันทึกเวลานัดของลูกค้า\n• แจ้งเตือนก่อนถึงคิว\n• สรุปจำนวนคิวต่อวัน/สัปดาห์\n\nเหมาะมากสำหรับร้านเสริมสวย / คลินิก / Pet Shop ที่มีจองคิวค่ะ 📅";
+        }
+
+        setTimeout(() => addBubble(reply, "bot"), 500);
+      }
+
+      function handleSend() {
+        const text = chatInput.value.trim();
+        if (!text) return;
+        addBubble(text, "user");
+        chatInput.value = "";
+        botReply(text);
+      }
+
+      chatSend.addEventListener("click", handleSend);
+      chatInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") handleSend();
+      });
+
+      quickButtons.forEach((btn) =>
+        btn.addEventListener("click", () => {
+          const q = btn.dataset.q;
+          addBubble(q, "user");
+          botReply(q);
+        })
+      );
+
+      // ===== Additional Functions =====
+      
+      // Export data function
+      function exportData() {
+        const shopType = document.querySelector(
+          ".segment button.active"
+        ).dataset.shopType;
+        const data = DATA[shopType];
+        const csv = [
+          ["เวลา", "ลูกค้า", "รายละเอียด", "ยอดรวม", "สถานะ"],
+          ...data.orders.map((o) => [
+            o.time,
+            o.customer,
+            o.detail,
+            o.total,
+            o.status,
+          ]),
+        ]
+          .map((row) => row.join(","))
+          .join("\n");
+        
+        const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = `orders_${shopType}_${new Date().toISOString().split("T")[0]}.csv`;
+        link.click();
+      }
+
+      // Refresh data function (simulated)
+      function refreshData() {
+        const shopType = document.querySelector(
+          ".segment button.active"
+        ).dataset.shopType;
+        renderShop(shopType);
+        addBubble("อัปเดตข้อมูลเรียบร้อยแล้วค่ะ", "bot");
+      }
+
+      // Add keyboard shortcuts
+      document.addEventListener("keydown", (e) => {
+        if (e.ctrlKey || e.metaKey) {
+          if (e.key === "r") {
+            e.preventDefault();
+            refreshData();
+          } else if (e.key === "e") {
+            e.preventDefault();
+            exportData();
+          }
+        }
+      });
+
+      // ===== Lead Collection Modal =====
+      const leadModal = document.getElementById("lead-modal");
+      const btnDemoTemplate = document.getElementById("btn-demo-template");
+      const modalClose = document.getElementById("modal-close");
+      const leadForm = document.getElementById("lead-form");
+      const templatePreview = document.getElementById("template-preview");
+      const templateContent = document.getElementById("template-content");
+      const templateTabs = document.querySelectorAll(".template-tab");
+
+      // Open modal
+      btnDemoTemplate.addEventListener("click", () => {
+        leadModal.classList.add("active");
+        templatePreview.classList.remove("active");
+        leadForm.reset();
+      });
+
+      // Close modal
+      function closeModal() {
+        leadModal.classList.remove("active");
+        templatePreview.classList.remove("active");
+        leadForm.style.display = "block";
+        leadForm.reset();
+      }
+
+      modalClose.addEventListener("click", closeModal);
+
+      leadModal.addEventListener("click", (e) => {
+        if (e.target === leadModal) {
+          closeModal();
+        }
+      });
+
+      // Template data - Comprehensive structure for demo app
+      const templateData = {
+        orders: {
+          headers: ["วันที่", "เวลา", "เลขที่ออเดอร์", "รหัสลูกค้า", "ชื่อลูกค้า", "รายการ", "จำนวน", "ราคาต่อหน่วย", "ยอดรวม", "ส่วนลด", "ยอดสุทธิ", "สถานะ", "ช่องทางการขาย", "หมายเหตุ"],
+          rows: [
+            ["2024-01-15", "10:15", "ORD-001", "C001", "คุณโบ", "อาบน้ำ+ตัดขน", "1", "890", "890", "0", "890", "เสร็จแล้ว", "หน้าร้าน", ""],
+            ["2024-01-15", "11:40", "ORD-002", "C002", "คุณแป้ง", "อาหารเม็ด 3 กก.", "1", "1250", "1250", "50", "1200", "จัดส่ง", "ออนไลน์", "ส่งด่วน"],
+            ["2024-01-15", "13:05", "ORD-003", "C003", "คุณฟ้า", "ฝากเลี้ยง 1 วัน", "1", "750", "750", "0", "750", "เช็คอินแล้ว", "โทรจอง", ""],
+            ["2024-01-15", "14:30", "ORD-004", "C001", "คุณโบ", "วัคซีนรวม", "1", "1500", "1500", "100", "1400", "รอตรวจ", "หน้าร้าน", "นัดหมาย"],
+          ]
+        },
+        products: {
+          headers: ["รหัสสินค้า", "ชื่อสินค้า/บริการ", "ประเภท", "หมวดหมู่", "ราคาขาย", "ต้นทุน", "กำไรต่อหน่วย", "กำไร%", "สต็อกปัจจุบัน", "สต็อกขั้นต่ำ", "หน่วย", "ผู้จำหน่าย", "สถานะ", "วันที่เพิ่ม"],
+          rows: [
+            ["P001", "อาบน้ำสุนัข", "บริการ", "บริการดูแล", "300", "100", "200", "66.7%", "-", "-", "ครั้ง", "-", "เปิดใช้งาน", "2024-01-01"],
+            ["P002", "อาหารเม็ดสุนัข 1 กก.", "สินค้า", "อาหารสัตว์", "450", "280", "170", "37.8%", "15", "5", "ถุง", "ABC Pet Supply", "เปิดใช้งาน", "2024-01-01"],
+            ["P003", "วัคซีนรวม", "บริการ", "บริการสุขภาพ", "1500", "800", "700", "46.7%", "-", "-", "ครั้ง", "-", "เปิดใช้งาน", "2024-01-01"],
+            ["P004", "ฝากเลี้ยง 1 วัน", "บริการ", "บริการดูแล", "750", "200", "550", "73.3%", "-", "-", "วัน", "-", "เปิดใช้งาน", "2024-01-01"],
+            ["P005", "ขนมสุนัข", "สินค้า", "อาหารสัตว์", "120", "60", "60", "50.0%", "25", "10", "ถุง", "XYZ Pet Food", "เปิดใช้งาน", "2024-01-05"],
+          ]
+        },
+        customers: {
+          headers: ["รหัสลูกค้า", "ชื่อ-นามสกุล", "เบอร์โทร", "อีเมล", "LINE ID", "ที่อยู่", "ประเภท", "วันที่สมัคร", "คะแนนสะสม", "ยอดซื้อรวม", "จำนวนออเดอร์", "ออเดอร์ล่าสุด", "สถานะ", "หมายเหตุ"],
+          rows: [
+            ["C001", "คุณโบ", "081-234-5678", "bo@email.com", "@bo123", "กรุงเทพฯ", "สมาชิก", "2024-01-01", "250", "3240", "5", "2024-01-15", "ใช้งาน", "ลูกค้าประจำ"],
+            ["C002", "คุณแป้ง", "082-345-6789", "paeng@email.com", "-", "นนทบุรี", "ทั่วไป", "2024-01-10", "0", "1200", "1", "2024-01-15", "ใช้งาน", ""],
+            ["C003", "คุณฟ้า", "083-456-7890", "fah@email.com", "@fah456", "ปทุมธานี", "สมาชิก", "2023-12-15", "500", "4500", "8", "2024-01-15", "ใช้งาน", "VIP"],
+            ["C004", "คุณโอ", "084-567-8901", "o@email.com", "@o789", "กรุงเทพฯ", "สมาชิก", "2024-01-12", "100", "1500", "2", "2024-01-14", "ใช้งาน", ""],
+          ]
+        },
+        analytics: {
+          headers: ["วันที่", "ยอดขายรวม", "จำนวนออเดอร์", "ลูกค้าใหม่", "ลูกค้าเก่า", "ออเดอร์หน้าร้าน", "ออเดอร์ออนไลน์", "กำไรรวม", "ค่าใช้จ่าย", "กำไรสุทธิ", "อัตรากำไร%", "ยอดขายเฉลี่ย/ออเดอร์"],
+          rows: [
+            ["2024-01-15", "12450", "24", "5", "19", "15", "9", "4980", "1200", "3780", "30.3%", "518.75"],
+            ["2024-01-14", "10500", "20", "3", "17", "12", "8", "4200", "1100", "3100", "29.5%", "525.00"],
+            ["2024-01-13", "11800", "22", "4", "18", "14", "8", "4720", "1150", "3570", "30.3%", "536.36"],
+            ["2024-01-12", "11200", "21", "2", "19", "13", "8", "4480", "1080", "3400", "30.4%", "533.33"],
+            ["2024-01-11", "9800", "18", "1", "17", "11", "7", "3920", "1000", "2920", "29.8%", "544.44"],
+          ]
+        },
+        inventory: {
+          headers: ["รหัสสินค้า", "ชื่อสินค้า", "สต็อกปัจจุบัน", "สต็อกขั้นต่ำ", "สต็อกสูงสุด", "หน่วย", "สถานะ", "แจ้งเตือน", "มูลค่าสต็อก", "ยอดขาย 30 วัน", "หมวดหมู่"],
+          rows: [
+            ["P002", "อาหารเม็ดสุนัข 1 กก.", "15", "5", "50", "ถุง", "ปกติ", "ไม่ต้องเติม", "4200", "45", "อาหารสัตว์"],
+            ["P005", "ขนมสุนัข", "25", "10", "100", "ถุง", "ปกติ", "ไม่ต้องเติม", "3000", "60", "อาหารสัตว์"],
+            ["P006", "ของเล่นสุนัข", "8", "10", "30", "ชิ้น", "ใกล้หมด", "ต้องเติม", "2400", "12", "ของเล่น"],
+            ["P007", "สายจูง", "5", "5", "20", "เส้น", "ใกล้หมด", "ต้องเติม", "1500", "8", "อุปกรณ์"],
+          ]
+        },
+        appointments: {
+          headers: ["วันที่", "เวลา", "รหัสลูกค้า", "ชื่อลูกค้า", "เบอร์โทร", "บริการ", "สถานะ", "พนักงาน", "หมายเหตุ", "ยืนยัน", "ยกเลิก"],
+          rows: [
+            ["2024-01-16", "10:00", "C001", "คุณโบ", "081-234-5678", "อาบน้ำ+ตัดขน", "จองแล้ว", "พี่แอน", "", "✓", ""],
+            ["2024-01-16", "11:30", "C003", "คุณฟ้า", "083-456-7890", "ฝากเลี้ยง", "จองแล้ว", "พี่มิ้ง", "2 วัน", "✓", ""],
+            ["2024-01-16", "14:00", "C004", "คุณโอ", "084-567-8901", "วัคซีน", "รอยืนยัน", "-", "นัดใหม่", "", ""],
+            ["2024-01-17", "09:00", "C002", "คุณแป้ง", "082-345-6789", "อาบน้ำ", "จองแล้ว", "พี่แอน", "", "✓", ""],
+          ]
+        }
+      };
+
+      // Render template table
+      function renderTemplate(tabName) {
+        const data = templateData[tabName];
+        if (!data) return;
+
+        let html = `<table class="template-table"><thead><tr>`;
+        data.headers.forEach(header => {
+          html += `<th>${header}</th>`;
+        });
+        html += `</tr></thead><tbody>`;
+        
+        data.rows.forEach(row => {
+          html += `<tr>`;
+          row.forEach(cell => {
+            html += `<td>${cell}</td>`;
+          });
+          html += `</tr>`;
+        });
+        
+        html += `</tbody></table>`;
+        templateContent.innerHTML = html;
+      }
+
+      // Tab switching
+      templateTabs.forEach(tab => {
+        tab.addEventListener("click", () => {
+          templateTabs.forEach(t => t.classList.remove("active"));
+          tab.classList.add("active");
+          renderTemplate(tab.dataset.tab);
+        });
+      });
+
+      // Google Apps Script Web App URL
+      // TODO: Replace this with your actual Google Apps Script Web App URL after deployment
+      const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzSW2W7G4WS5DAB_Jk6Q9y5w_7yKzEckCepIT-2e9NqxoQbLjGKZLRP6x54_bQQdZZ8WQ/exec';
+
+      // Form submission
+      leadForm.addEventListener("submit", (e) => {
+        e.preventDefault();
+        
+        const submitBtn = document.getElementById("submit-btn");
+        submitBtn.disabled = true;
+        submitBtn.textContent = "กำลังส่งข้อมูล...";
+
+        // Collect form data
+        const formData = new FormData(leadForm);
+        const leadData = {
+          businessName: formData.get("businessName"),
+          businessType: formData.get("businessType"),
+          contactName: formData.get("contactName"),
+          email: formData.get("email"),
+          phone: formData.get("phone"),
+          lineId: formData.get("lineId") || '',
+          timestamp: new Date().toISOString()
+        };
+
+        // Send to Google Sheets via Google Apps Script
+        if (GOOGLE_SCRIPT_URL && GOOGLE_SCRIPT_URL !== 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL_HERE') {
+          // Send data to Google Apps Script
+          fetch(GOOGLE_SCRIPT_URL, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(leadData)
+          })
+          .then(response => response.json())
+          .then(result => {
+            console.log("Lead saved successfully:", result);
+            
+            // Success - hide form and show template preview
+            leadForm.style.display = "none";
+            templatePreview.classList.add("active");
+            renderTemplate("orders");
+            
+            // Add template link if available
+            if (result.templateUrl) {
+              const templateLinkDiv = document.createElement("div");
+              templateLinkDiv.style.cssText = "margin-top: 16px; padding: 12px; background: rgba(104, 159, 56, 0.1); border-radius: 8px; border-left: 3px solid #689f38;";
+              templateLinkDiv.innerHTML = `
+                <div style="font-weight: 600; color: #5d4037; margin-bottom: 8px;">✅ Template Google Sheets ของคุณพร้อมแล้ว!</div>
+                <div style="font-size: 12px; color: #8b7355; margin-bottom: 8px;">เราได้ส่งลิงก์ไปยังอีเมลของคุณแล้ว หรือคลิกที่ลิงก์ด้านล่าง:</div>
+                <a href="${result.templateUrl}" target="_blank" style="display: inline-block; padding: 8px 16px; background: linear-gradient(135deg, #8b7355, #6b5d4f); color: #faf8f3; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 13px;">
+                  เปิด Google Sheets Template
+                </a>
+              `;
+              templatePreview.insertBefore(templateLinkDiv, templatePreview.firstChild.nextSibling);
+            }
+            
+            // Scroll to template
+            templatePreview.scrollIntoView({ behavior: "smooth", block: "start" });
+            
+            submitBtn.disabled = false;
+            submitBtn.textContent = "ส่งข้อมูล";
+          })
+          .catch((error) => {
+            console.error("Error submitting lead:", error);
+            // Still show template even if there's an error
+            leadForm.style.display = "none";
+            templatePreview.classList.add("active");
+            renderTemplate("orders");
+            templatePreview.scrollIntoView({ behavior: "smooth", block: "start" });
+            
+            submitBtn.disabled = false;
+            submitBtn.textContent = "ส่งข้อมูล";
+            
+            // Show error message but don't block the user
+            console.warn("Note: There was an error saving to Google Sheets, but template is still shown");
+          });
+        } else {
+          // Fallback if URL not configured - still show template
+          console.log("Lead captured (not sent to Google Sheets - URL not configured):", leadData);
+          console.warn("Please configure GOOGLE_SCRIPT_URL in the JavaScript code");
+          
+          // Hide form and show template preview
+          leadForm.style.display = "none";
+          templatePreview.classList.add("active");
+          renderTemplate("orders");
+          
+          // Scroll to template
+          templatePreview.scrollIntoView({ behavior: "smooth", block: "start" });
+          
+          submitBtn.disabled = false;
+          submitBtn.textContent = "ส่งข้อมูล";
+        }
+      });
+    </script>
+  </body>
+</html>
