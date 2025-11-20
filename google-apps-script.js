@@ -100,42 +100,118 @@ function doPost(e) {
     const dateStr = Utilities.formatDate(now, Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss');
     Logger.log('Formatted timestamp: ' + dateStr);
     
-    // Add the data
-    const rowData = [
-      data.timestamp || dateStr,
-      data.businessName || '',
-      data.businessType || '',
-      data.contactName || '',
-      data.email || '',
-      data.phone || '',
-      data.lineId || '',
-      dateStr
-    ];
+    // Check if this is a package order
+    const isPackageOrder = data.businessType === 'package' || data.package;
+    
+    // Add the data - extend columns if package order
+    let rowData;
+    if (isPackageOrder) {
+      // Package orders need more columns
+      const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+      const numColumns = Math.max(headers.length, 15);
+      
+      // Ensure headers exist for package orders
+      if (headers.length < 15 || !headers.includes('Package')) {
+        const newHeaders = [
+          'Timestamp', 
+          'Business Name', 
+          'Business Type', 
+          'Contact Name', 
+          'Email', 
+          'Phone', 
+          'LINE ID', 
+          'Date Submitted', 
+          'Package', 
+          'Package Name', 
+          'Package Price', 
+          'Verified Amount',
+          'Payment Status',
+          'Requirements',
+          'Additional Info'
+        ];
+        sheet.getRange(1, 1, 1, 15).setValues([newHeaders]);
+        // Format header row
+        formatSheetHeader(sheet, 1, 15);
+        Logger.log('Created package order headers (15 columns)');
+      }
+      
+      rowData = [
+        data.timestamp || dateStr,
+        data.businessName || '',
+        data.businessType || '',
+        data.contactName || '',
+        data.email || '',
+        data.phone || '',
+        data.lineId || '',
+        dateStr,
+        data.package || '',
+        data.packageName || '',
+        data.packagePrice || '',
+        data.verifiedAmount || '',
+        data.paymentStatus || 'Pending Payment',
+        data.requirements || '',
+        data.additionalInfo || ''
+      ];
+      Logger.log('Package order row data prepared with ' + rowData.length + ' columns');
+    } else {
+      rowData = [
+        data.timestamp || dateStr,
+        data.businessName || '',
+        data.businessType || '',
+        data.contactName || '',
+        data.email || '',
+        data.phone || '',
+        data.lineId || '',
+        dateStr
+      ];
+    }
+    
     Logger.log('Row data to insert: ' + JSON.stringify(rowData));
-    sheet.getRange(nextRow, 1, 1, 8).setValues([rowData]);
+    sheet.getRange(nextRow, 1, 1, rowData.length).setValues([rowData]);
     Logger.log('Data inserted into row ' + nextRow);
     
     // Auto-resize columns
-    sheet.autoResizeColumns(1, 8);
+    sheet.autoResizeColumns(1, rowData.length);
     Logger.log('Columns auto-resized');
     
-    // Create template spreadsheet for the user
-    Logger.log('Creating template spreadsheet...');
-    const templateSpreadsheetId = createTemplateSpreadsheet(data);
-    Logger.log('Template spreadsheet ID: ' + (templateSpreadsheetId || 'null'));
-    
-    // Send email notification with template link
-    Logger.log('Sending email notification to admin...');
-    sendEmailNotification(data, templateSpreadsheetId);
-    Logger.log('Admin email notification sent');
-    
-    // Send template link to user
-    if (templateSpreadsheetId && data.email) {
-      Logger.log('Sending template email to user: ' + data.email);
-      sendTemplateEmailToUser(data, templateSpreadsheetId);
-      Logger.log('User email sent');
+    if (isPackageOrder) {
+      // Handle package order
+      Logger.log('Processing package order...');
+      Logger.log('Package: ' + (data.package || 'N/A'));
+      Logger.log('Package Name: ' + (data.packageName || 'N/A'));
+      Logger.log('Package Price: ' + (data.packagePrice || 'N/A'));
+      
+      // Send package order notification to admin
+      Logger.log('Sending package order notification to admin...');
+      sendPackageOrderNotification(data);
+      Logger.log('Package order notification sent');
+      
+      // Send confirmation email to customer
+      if (data.email) {
+        Logger.log('Sending package confirmation email to customer: ' + data.email);
+        sendPackageConfirmationEmail(data);
+        Logger.log('Package confirmation email sent');
+      }
     } else {
-      Logger.log('Skipping user email - templateSpreadsheetId: ' + templateSpreadsheetId + ', email: ' + (data.email || 'missing'));
+      // Handle regular lead (template creation)
+      // Create template spreadsheet for the user
+      Logger.log('Creating template spreadsheet...');
+      const templateSpreadsheetId = createTemplateSpreadsheet(data);
+      Logger.log('Template spreadsheet ID: ' + (templateSpreadsheetId || 'null'));
+      
+      // Send email notification with template link
+      Logger.log('Sending email notification to admin...');
+      sendEmailNotification(data, templateSpreadsheetId);
+      Logger.log('Admin email notification sent');
+      
+      // Send template link to user
+      if (templateSpreadsheetId && data.email) {
+        Logger.log('Sending template email to user: ' + data.email);
+        sendTemplateEmailToUser(data, templateSpreadsheetId);
+        Logger.log('User email sent');
+      } else {
+        Logger.log('Skipping user email - templateSpreadsheetId: ' + templateSpreadsheetId + ', email: ' + (data.email || 'missing'));
+      }
     }
     
     // Return success response with template link
@@ -630,6 +706,241 @@ https://docs.google.com/spreadsheets/d/${templateSpreadsheetId}/edit
     Logger.log('Error message: ' + error.toString());
     Logger.log('Error stack: ' + (error.stack || 'No stack trace'));
     console.error('Error sending template email to user:', error);
+    // Don't fail the whole request if email fails
+  }
+}
+
+/**
+ * Send package order notification to admin
+ */
+function sendPackageOrderNotification(data) {
+  Logger.log('=== sendPackageOrderNotification() called ===');
+  Logger.log('Package: ' + (data.package || 'N/A'));
+  Logger.log('Customer: ' + (data.contactName || 'N/A'));
+  Logger.log('Email: ' + (data.email || 'N/A'));
+  
+  try {
+    const packageNames = {
+      'basic': '🥉 BASIC - ระบบพื้นฐาน 1 ระบบ',
+      'standard': '🥈 STANDARD - ระบบ 2–3 ระบบรวมกัน',
+      'premium': '🥇 PREMIUM - ระบบครบวงจรสำหรับร้านค้า SME'
+    };
+    
+    const packageName = data.packageName || packageNames[data.package] || data.package || 'Unknown Package';
+    const packagePrice = data.packagePrice || 'N/A';
+    const verifiedAmount = data.verifiedAmount || 'N/A';
+    const paymentStatus = data.paymentStatus || 'Pending';
+    const requirements = data.requirements || 'N/A';
+    const additionalInfo = data.additionalInfo || 'N/A';
+    
+    const subject = '📦 New Package Order - ' + packageName;
+    Logger.log('Email subject: ' + subject);
+    
+    const htmlBody = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #8b7355;">New Package Order Received</h2>
+        <p>You have received a new package order:</p>
+        
+        <div style="background: #f5f1e8; padding: 20px; border-radius: 10px; margin: 20px 0;">
+          <h3 style="color: #5d4037; margin-top: 0;">Package Details</h3>
+          <p style="font-size: 18px; font-weight: bold; color: #8b7355;">${packageName}</p>
+          <p style="font-size: 24px; font-weight: bold; color: #689f38;">Price: ${packagePrice.toLocaleString()} ฿</p>
+          <p style="font-size: 16px; color: #5d4037; margin-top: 8px;">
+            <strong>Payment Status:</strong> ${paymentStatus}<br>
+            <strong>Verified Amount:</strong> ${verifiedAmount.toLocaleString()} ฿
+          </p>
+        </div>
+        
+        <div style="background: #e8f5e9; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #689f38;">
+          <h4 style="color: #5d4037; margin-top: 0;">Customer Requirements:</h4>
+          <p style="color: #2e7d32; white-space: pre-wrap;">${requirements}</p>
+          ${additionalInfo && additionalInfo !== 'N/A' ? `
+          <h4 style="color: #5d4037; margin-top: 16px;">Additional Info:</h4>
+          <p style="color: #2e7d32; white-space: pre-wrap;">${additionalInfo}</p>
+          ` : ''}
+        </div>
+        
+        <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+          <tr style="background-color: #f5f1e8;">
+            <td style="padding: 10px; font-weight: bold; width: 150px;">Business Name:</td>
+            <td style="padding: 10px;">${data.businessName || 'N/A'}</td>
+          </tr>
+          <tr>
+            <td style="padding: 10px; font-weight: bold;">Contact Name:</td>
+            <td style="padding: 10px;">${data.contactName || 'N/A'}</td>
+          </tr>
+          <tr style="background-color: #f5f1e8;">
+            <td style="padding: 10px; font-weight: bold;">Email:</td>
+            <td style="padding: 10px;"><a href="mailto:${data.email || ''}">${data.email || 'N/A'}</a></td>
+          </tr>
+          <tr>
+            <td style="padding: 10px; font-weight: bold;">Phone:</td>
+            <td style="padding: 10px;">${data.phone || 'N/A'}</td>
+          </tr>
+          <tr style="background-color: #f5f1e8;">
+            <td style="padding: 10px; font-weight: bold;">LINE ID:</td>
+            <td style="padding: 10px;">${data.lineId || 'N/A'}</td>
+          </tr>
+          <tr>
+            <td style="padding: 10px; font-weight: bold;">Submitted:</td>
+            <td style="padding: 10px;">${new Date(data.timestamp).toLocaleString('th-TH') || 'N/A'}</td>
+          </tr>
+        </table>
+        
+        <p style="margin-top: 20px; color: #8b7355;">
+          <strong>View Order in Google Sheets:</strong><br>
+          <a href="https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/edit" 
+             style="color: #689f38; text-decoration: none;">
+            Open Leads Spreadsheet
+          </a>
+        </p>
+        
+        <div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin-top: 20px; border-left: 4px solid #f57c00;">
+          <p style="margin: 0; color: #856404;">
+            <strong>⚠️ Action Required:</strong> Please contact the customer to confirm payment and proceed with the package setup.
+          </p>
+        </div>
+      </div>
+    `;
+    
+    const plainBody = `
+New Package Order Received
+
+Package: ${packageName}
+Price: ${packagePrice.toLocaleString()} ฿
+Payment Status: ${paymentStatus}
+Verified Amount: ${verifiedAmount.toLocaleString()} ฿
+
+Customer Requirements:
+${requirements}
+
+${additionalInfo && additionalInfo !== 'N/A' ? `Additional Info:\n${additionalInfo}\n\n` : ''}
+Customer Details:
+Business Name: ${data.businessName || 'N/A'}
+Contact Name: ${data.contactName || 'N/A'}
+Email: ${data.email || 'N/A'}
+Phone: ${data.phone || 'N/A'}
+LINE ID: ${data.lineId || 'N/A'}
+Submitted: ${new Date(data.timestamp).toLocaleString('th-TH') || 'N/A'}
+
+View Order in Google Sheets: https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/edit
+
+Action Required: Please contact the customer to confirm payment and proceed with the package setup.
+    `;
+    
+    Logger.log('Sending package order notification email to: ' + NOTIFICATION_EMAIL);
+    MailApp.sendEmail({
+      to: NOTIFICATION_EMAIL,
+      subject: subject,
+      htmlBody: htmlBody,
+      body: plainBody
+    });
+    Logger.log('Package order notification email sent successfully');
+    Logger.log('=== sendPackageOrderNotification() completed successfully ===');
+    
+  } catch (error) {
+    Logger.log('=== ERROR in sendPackageOrderNotification() ===');
+    Logger.log('Error message: ' + error.toString());
+    Logger.log('Error stack: ' + (error.stack || 'No stack trace'));
+    console.error('Error sending package order notification:', error);
+    // Don't fail the whole request if email fails
+  }
+}
+
+/**
+ * Send package confirmation email to customer
+ */
+function sendPackageConfirmationEmail(data) {
+  Logger.log('=== sendPackageConfirmationEmail() called ===');
+  Logger.log('Recipient: ' + (data.email || 'N/A'));
+  Logger.log('Package: ' + (data.package || 'N/A'));
+  
+  try {
+    const packageNames = {
+      'basic': '🥉 BASIC - ระบบพื้นฐาน 1 ระบบ',
+      'standard': '🥈 STANDARD - ระบบ 2–3 ระบบรวมกัน',
+      'premium': '🥇 PREMIUM - ระบบครบวงจรสำหรับร้านค้า SME'
+    };
+    
+    const packageName = data.packageName || packageNames[data.package] || data.package || 'Unknown Package';
+    const packagePrice = data.packagePrice || 'N/A';
+    const verifiedAmount = data.verifiedAmount || packagePrice;
+    
+    const subject = '📦 ยืนยันการสั่งซื้อแพ็กเกจ - ' + packageName;
+    Logger.log('Email subject: ' + subject);
+    
+    const htmlBody = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #faf8f3; padding: 20px;">
+        <h2 style="color: #8b7355;">สวัสดีค่ะ ${data.contactName || 'คุณลูกค้า'}</h2>
+        
+        <p>ขอบคุณสำหรับการสั่งซื้อแพ็กเกจบริการของเรา!</p>
+        
+        <div style="background: white; padding: 20px; border-radius: 10px; margin: 20px 0; border: 2px solid #8b7355;">
+          <h3 style="color: #5d4037; margin-top: 0;">รายละเอียดการสั่งซื้อ</h3>
+          <p style="font-size: 18px; font-weight: bold; color: #8b7355; margin-bottom: 8px;">${packageName}</p>
+          <p style="font-size: 24px; font-weight: bold; color: #689f38; margin: 0;">ราคา: ${packagePrice.toLocaleString()} ฿</p>
+          <p style="font-size: 14px; color: #689f38; margin-top: 8px;">✓ ยืนยันการชำระเงิน: ${verifiedAmount.toLocaleString()} ฿</p>
+        </div>
+        
+        <div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #f57c00;">
+          <p style="margin: 0; color: #856404;">
+            <strong>📋 ขั้นตอนต่อไป:</strong><br>
+            1. เราได้รับข้อมูลการสั่งซื้อของคุณแล้ว<br>
+            2. ทีมงานจะติดต่อกลับภายใน 24 ชั่วโมง<br>
+            3. หลังจากยืนยันการชำระเงินแล้ว จะเริ่มดำเนินการตั้งค่าระบบให้คุณ
+          </p>
+        </div>
+        
+        <div style="background: white; padding: 15px; border-radius: 8px; margin: 20px 0;">
+          <p style="margin: 0; color: #5d4037;">
+            <strong>📞 ติดต่อสอบถาม:</strong><br>
+            อีเมล: <a href="mailto:${NOTIFICATION_EMAIL}" style="color: #689f38;">${NOTIFICATION_EMAIL}</a>
+          </p>
+        </div>
+        
+        <p style="margin-top: 20px; color: #8b7355; font-size: 12px;">
+          ขอบคุณที่ให้ความสนใจในบริการของเรา<br>
+          ทีม AI Smart Backoffice
+        </p>
+      </div>
+    `;
+    
+    const plainBody = `
+สวัสดีค่ะ ${data.contactName || 'คุณลูกค้า'}
+
+ขอบคุณสำหรับการสั่งซื้อแพ็กเกจบริการของเรา!
+
+รายละเอียดการสั่งซื้อ:
+${packageName}
+ราคา: ${packagePrice.toLocaleString()} ฿
+
+ขั้นตอนต่อไป:
+1. เราได้รับข้อมูลการสั่งซื้อของคุณแล้ว
+2. ทีมงานจะติดต่อกลับภายใน 24 ชั่วโมง
+3. หลังจากยืนยันการชำระเงินแล้ว จะเริ่มดำเนินการตั้งค่าระบบให้คุณ
+
+ติดต่อสอบถาม:
+อีเมล: ${NOTIFICATION_EMAIL}
+
+ขอบคุณที่ให้ความสนใจในบริการของเรา
+ทีม AI Smart Backoffice
+    `;
+    
+    Logger.log('Sending package confirmation email to: ' + data.email);
+    MailApp.sendEmail({
+      to: data.email,
+      subject: subject,
+      htmlBody: htmlBody,
+      body: plainBody
+    });
+    Logger.log('Package confirmation email sent successfully');
+    Logger.log('=== sendPackageConfirmationEmail() completed successfully ===');
+    
+  } catch (error) {
+    Logger.log('=== ERROR in sendPackageConfirmationEmail() ===');
+    Logger.log('Error message: ' + error.toString());
+    Logger.log('Error stack: ' + (error.stack || 'No stack trace'));
+    console.error('Error sending package confirmation email:', error);
     // Don't fail the whole request if email fails
   }
 }
