@@ -993,8 +993,8 @@
             <input type="text" class="form-input" name="businessName" required placeholder="เช่น ร้านขายของชำ ABC" />
           </div>
           <div class="form-group">
-            <label class="form-label">ประเภทธุรกิจ *</label>
-            <select class="form-select" name="businessType" required>
+            <label class="form-label" for="businessType">ประเภทธุรกิจ *</label>
+            <select class="form-select" name="businessType" id="businessType" required title="เลือกประเภทธุรกิจ">
               <option value="">เลือกประเภทธุรกิจ</option>
               <option value="pet">Pet Shop</option>
               <option value="food">ร้านอาหาร</option>
@@ -1192,6 +1192,24 @@
 
     <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
     <script>
+      // Ensure QRCode is available globally
+      window.addEventListener('load', function() {
+        if (typeof QRCode !== 'undefined') {
+          console.log('✓ QRCode library loaded successfully');
+        } else {
+          console.error('✗ QRCode library failed to load - trying alternative CDN');
+          // Fallback to alternative CDN
+          const script = document.createElement('script');
+          script.src = 'https://unpkg.com/qrcode@1.5.3/build/qrcode.min.js';
+          script.onload = function() {
+            console.log('✓ QRCode library loaded from fallback CDN');
+          };
+          script.onerror = function() {
+            console.error('✗ Both CDNs failed to load QRCode library');
+          };
+          document.head.appendChild(script);
+        }
+      });
       // ===== Mock Data per shop type =====
       const DATA = {
         pet: {
@@ -1906,15 +1924,18 @@
           document.getElementById("package-amount").textContent = `${info.price.toLocaleString()} ฿`;
           document.getElementById("package-name").textContent = info.displayName;
           
-          // Generate Thai QR Code for payment
-          generateThaiQRCode(info.price, info.name);
+          // Generate Thai QR Code for payment (with delay to ensure library is loaded)
+          setTimeout(() => {
+            generateThaiQRCode(info.price, info.name);
+          }, 100);
         });
       });
 
       // Payment verification
       let paymentVerified = false;
       let verifiedAmount = null;
-      document.getElementById("verify-payment-btn").addEventListener("click", () => {
+      
+      function verifyPayment() {
         if (!selectedPackage) {
           alert("กรุณาเลือกแพ็กเกจก่อน");
           return;
@@ -1923,81 +1944,59 @@
         const info = packageInfo[selectedPackage];
         const expectedAmount = info.price;
         
-        // For now, we'll simulate payment verification
-        // In production, you would integrate with payment gateway API
-        // For manual verification, you can check your bank account
-        
-        // Show verification prompt
-        const verifyAmount = prompt(
-          `กรุณายืนยันจำนวนเงินที่ชำระ:\n\n` +
+        // Show confirmation dialog
+        const confirmed = confirm(
+          `ยืนยันการชำระเงิน\n\n` +
           `แพ็กเกจ: ${info.displayName}\n` +
-          `จำนวนเงินที่ต้องชำระ: ${expectedAmount.toLocaleString()} ฿\n\n` +
-          `กรุณากรอกจำนวนเงินที่คุณชำระแล้ว (฿):`
+          `จำนวนเงิน: ${expectedAmount.toLocaleString()} ฿\n\n` +
+          `คุณได้ชำระเงินเรียบร้อยแล้วใช่หรือไม่?`
         );
         
-        if (!verifyAmount) {
+        if (!confirmed) {
           return; // User cancelled
-        }
-        
-        const paidAmount = parseFloat(verifyAmount.replace(/[^\d.]/g, ''));
-        
-        if (isNaN(paidAmount)) {
-          alert("กรุณากรอกจำนวนเงินที่ถูกต้อง");
-          return;
-        }
-        
-        // Check if amount matches (allow small difference for rounding)
-        const difference = Math.abs(paidAmount - expectedAmount);
-        if (difference > 1) {
-          // Amount doesn't match - show error
-          document.getElementById("payment-error").style.display = "block";
-          document.getElementById("payment-error").innerHTML = `
-            <p style="margin-bottom: 8px;"><strong>⚠️ จำนวนเงินไม่ตรงกัน</strong></p>
-            <p style="font-size: 12px; margin-bottom: 8px;">
-              จำนวนเงินที่ต้องชำระ: <strong>${expectedAmount.toLocaleString()} ฿</strong><br>
-              จำนวนเงินที่คุณชำระ: <strong>${paidAmount.toLocaleString()} ฿</strong>
-            </p>
-            <p style="font-size: 12px; margin-bottom: 12px;">กรุณาตรวจสอบและชำระเงินจำนวนที่ถูกต้อง</p>
-            <button class="btn-submit" id="retry-payment-btn" style="background: linear-gradient(135deg, #8b7355, #6b5d4f); max-width: 200px; margin-right: 8px;">
-              ลองอีกครั้ง
-            </button>
-            <button class="btn-submit" id="contact-support-btn" style="background: linear-gradient(135deg, #f57c00, #e65100); max-width: 250px;">
-              📧 ติดต่อเพื่อขอความช่วยเหลือ
-            </button>
-          `;
-          
-          // Retry button
-          document.getElementById("retry-payment-btn").addEventListener("click", () => {
-            document.getElementById("payment-error").style.display = "none";
-          });
-          
-          // Contact support button (use event delegation)
-          document.addEventListener("click", (e) => {
-            if (e.target && e.target.id === "contact-support-btn") {
-              const subject = encodeURIComponent(`ปัญหาการชำระเงิน - แพ็กเกจ ${info.displayName}`);
-              const body = encodeURIComponent(
-                `สวัสดีค่ะ\n\n` +
-                `ฉันมีปัญหาการชำระเงินสำหรับแพ็กเกจ: ${info.displayName}\n` +
-                `จำนวนเงินที่ต้องชำระ: ${expectedAmount.toLocaleString()} ฿\n` +
-                `จำนวนเงินที่ฉันชำระ: ${paidAmount.toLocaleString()} ฿\n\n` +
-                `กรุณาช่วยเหลือด้วยค่ะ\n\n` +
-                `ขอบคุณค่ะ`
-              );
-              const email = 'tripetkk@gmail.com'; // Use your email
-              window.location.href = `mailto:${email}?subject=${subject}&body=${body}`;
-            }
-          });
-          return;
         }
         
         // Payment verified - proceed to form
         paymentVerified = true;
-        verifiedAmount = paidAmount;
+        verifiedAmount = expectedAmount;
         
         // Hide QR step, show form step
         document.getElementById("payment-qr-step").style.display = "none";
         document.getElementById("payment-form-step").style.display = "block";
         document.getElementById("payment-error").style.display = "none";
+        
+        console.log('Payment verified:', {
+          package: selectedPackage,
+          amount: verifiedAmount,
+          status: 'Verified'
+        });
+      }
+      
+      // Attach event listener to verify button
+      const verifyBtn = document.getElementById("verify-payment-btn");
+      if (verifyBtn) {
+        verifyBtn.addEventListener("click", verifyPayment);
+      }
+      
+      // Handle payment error contact support
+      document.addEventListener("click", (e) => {
+        if (e.target && e.target.id === "contact-support-btn") {
+          const info = packageInfo[selectedPackage];
+          const subject = encodeURIComponent(`ปัญหาการชำระเงิน - แพ็กเกจ ${info.displayName}`);
+          const body = encodeURIComponent(
+            `สวัสดีค่ะ\n\n` +
+            `ฉันมีปัญหาการชำระเงินสำหรับแพ็กเกจ: ${info.displayName}\n` +
+            `จำนวนเงินที่ต้องชำระ: ${info.price.toLocaleString()} ฿\n\n` +
+            `กรุณาช่วยเหลือด้วยค่ะ\n\n` +
+            `ขอบคุณค่ะ`
+          );
+          const email = 'tripetkk@gmail.com';
+          window.location.href = `mailto:${email}?subject=${subject}&body=${body}`;
+        }
+        
+        if (e.target && e.target.id === "retry-payment-btn") {
+          document.getElementById("payment-error").style.display = "none";
+        }
       });
 
       // Generate Thai QR Code for PromptPay
@@ -2005,11 +2004,14 @@
         console.log('Generating Thai QR Code for amount:', amount, 'package:', packageName);
         console.log('Using PromptPay ID:', PAYMENT_CONFIG.promptPayId);
         
+        const qrContainer = document.getElementById("qrcode");
+        qrContainer.innerHTML = '<div style="padding: 20px; text-align: center; color: #8b7355;">กำลังสร้าง QR Code...</div>';
+        
         // Validate PromptPay ID
         if (!PAYMENT_CONFIG.promptPayId || PAYMENT_CONFIG.promptPayId.length < 10) {
           console.warn('⚠️ WARNING: PromptPay ID not configured properly!');
-          document.getElementById("qrcode").innerHTML = 
-            '<div style="padding: 20px; color: #f57c00; text-align: center;">' +
+          qrContainer.innerHTML = 
+            '<div style="padding: 20px; color: #f57c00; text-align: center; border: 2px dashed #f57c00; border-radius: 8px;">' +
             '⚠️ กรุณาติดต่อเพื่อชำระเงิน<br>' +
             'โทร: ' + PAYMENT_CONFIG.contactPhone + '<br>' +
             '<small style="color: #8b7355;">(QR Code ยังไม่ได้ตั้งค่า)</small>' +
@@ -2017,9 +2019,34 @@
           return;
         }
         
-        // Check if it's still the default placeholder (for National ID, it should be 13 digits)
-        if (PAYMENT_CONFIG.promptPayId === "0812345678" && PAYMENT_CONFIG.promptPayId.length === 10) {
-          console.warn('⚠️ WARNING: Using default PromptPay ID!');
+        // Check if QRCode library is loaded - wait a bit if not ready
+        if (typeof QRCode === 'undefined' || !QRCode.toCanvas) {
+          console.warn('QRCode library not loaded yet, waiting...');
+          qrContainer.innerHTML = '<div style="padding: 20px; text-align: center; color: #8b7355;">กำลังโหลด QR Code Library...</div>';
+          
+          // Wait for library to load (max 5 seconds)
+          let attempts = 0;
+          const maxAttempts = 50; // 5 seconds
+          const checkQRCode = setInterval(() => {
+            attempts++;
+            if (typeof QRCode !== 'undefined' && QRCode.toCanvas) {
+              clearInterval(checkQRCode);
+              console.log('QRCode library loaded, generating QR code...');
+              // Retry generating QR code
+              setTimeout(() => generateThaiQRCode(amount, packageName), 50);
+            } else if (attempts >= maxAttempts) {
+              clearInterval(checkQRCode);
+              console.error('QRCode library failed to load after 5 seconds');
+              qrContainer.innerHTML = 
+                '<div style="padding: 20px; color: #f57c00; text-align: center; border: 2px dashed #f57c00; border-radius: 8px;">' +
+                '⚠️ ไม่สามารถโหลด QR Code Library<br>' +
+                'กรุณารีเฟรชหน้าเว็บ<br>' +
+                'หรือติดต่อ: ' + PAYMENT_CONFIG.contactPhone + '<br>' +
+                '<button onclick="location.reload()" style="margin-top: 10px; padding: 8px 16px; background: #8b7355; color: white; border: none; border-radius: 6px; cursor: pointer;">รีเฟรชหน้าเว็บ</button>' +
+                '</div>';
+            }
+          }, 100);
+          return;
         }
         
         const promptPayId = PAYMENT_CONFIG.promptPayId;
@@ -2036,48 +2063,56 @@
         const paddedPromptPayId = promptPayId.padStart(13, '0');
         const qrData = `00020101021243000016A00000067701011101130066${paddedPromptPayId}5802TH5303764540${amountStr}5404${amountStr}6304`;
         
-        // For production, use proper Thai QR code library
-        // For now, generate QR with payment info that includes amount
-        const paymentInfo = {
-          amount: amount,
-          package: packageName,
-          merchant: merchantName,
-          promptPayId: promptPayId,
-          qrData: qrData
-        };
-        
         // Generate QR code with Thai QR format string
         const qrString = qrData; // Use the actual Thai QR format string
         
         // Clear previous QR code
-        const qrContainer = document.getElementById("qrcode");
         qrContainer.innerHTML = "";
         
+        // Create a canvas element for QR code
+        const canvas = document.createElement('canvas');
+        qrContainer.appendChild(canvas);
+        
         // Generate QR code using qrcode.js library
-        QRCode.toCanvas(qrContainer, qrString, {
-          width: 250,
-          margin: 2,
-          color: {
-            dark: '#000000',
-            light: '#FFFFFF'
+        try {
+          if (typeof QRCode === 'undefined' || !QRCode.toCanvas) {
+            throw new Error('QRCode library not available');
           }
-        }, function (error) {
-          if (error) {
-            console.error('QR Code generation error:', error);
-            qrContainer.innerHTML = 
-              '<div style="padding: 20px; color: #8b7355; text-align: center;">' +
-              'ไม่สามารถสร้าง QR Code ได้<br>' +
-              'กรุณาติดต่อ: ' + PAYMENT_CONFIG.contactPhone +
-              '</div>';
-          } else {
-            console.log('QR Code generated successfully');
-            // Also show payment details below QR
-            const paymentDetails = document.createElement('div');
-            paymentDetails.style.cssText = 'margin-top: 12px; font-size: 12px; color: #8b7355;';
-            paymentDetails.innerHTML = `จำนวนเงิน: ${amount.toLocaleString()} ฿<br>รับเงิน: ${merchantName}`;
-            qrContainer.appendChild(paymentDetails);
-          }
-        });
+          
+          QRCode.toCanvas(canvas, qrString, {
+            width: 250,
+            margin: 2,
+            color: {
+              dark: '#000000',
+              light: '#FFFFFF'
+            },
+            errorCorrectionLevel: 'M'
+          }, function (error) {
+            if (error) {
+              console.error('QR Code generation error:', error);
+              qrContainer.innerHTML = 
+                '<div style="padding: 20px; color: #8b7355; text-align: center; border: 2px dashed #8b7355; border-radius: 8px;">' +
+                '⚠️ ไม่สามารถสร้าง QR Code ได้<br>' +
+                'กรุณาติดต่อ: ' + PAYMENT_CONFIG.contactPhone + '<br>' +
+                '<small style="color: #8b7355;">หรือชำระเงินโดยตรง</small>' +
+                '</div>';
+            } else {
+              console.log('QR Code generated successfully');
+              // Add payment details below QR
+              const paymentDetails = document.createElement('div');
+              paymentDetails.style.cssText = 'margin-top: 12px; font-size: 12px; color: #8b7355; text-align: center;';
+              paymentDetails.innerHTML = `จำนวนเงิน: <strong>${amount.toLocaleString()} ฿</strong><br>รับเงิน: ${merchantName}`;
+              qrContainer.appendChild(paymentDetails);
+            }
+          });
+        } catch (err) {
+          console.error('Error generating QR code:', err);
+          qrContainer.innerHTML = 
+            '<div style="padding: 20px; color: #f57c00; text-align: center; border: 2px dashed #f57c00; border-radius: 8px;">' +
+            '⚠️ เกิดข้อผิดพลาดในการสร้าง QR Code<br>' +
+            'กรุณาติดต่อ: ' + PAYMENT_CONFIG.contactPhone +
+            '</div>';
+        }
       }
 
       // Package form submission
