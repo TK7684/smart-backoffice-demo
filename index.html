@@ -2194,19 +2194,22 @@
         // Format: Payload Format Indicator + Point of Initiation + Merchant Account Info + Currency + Amount + Country + CRC
         
         // Helper function to calculate CRC-16/CCITT-FALSE checksum
+        // Based on EMV QR Code standard and THAI_QRCODE repository
         function calculateCRC16(data) {
           let crc = 0xFFFF;
+          const polynomial = 0x1021;
+          
           for (let i = 0; i < data.length; i++) {
-            crc ^= data.charCodeAt(i) << 8;
+            crc ^= (data.charCodeAt(i) << 8);
             for (let j = 0; j < 8; j++) {
               if (crc & 0x8000) {
-                crc = (crc << 1) ^ 0x1021;
+                crc = ((crc << 1) ^ polynomial) & 0xFFFF;
               } else {
-                crc = crc << 1;
+                crc = (crc << 1) & 0xFFFF;
               }
             }
           }
-          return (crc & 0xFFFF).toString(16).toUpperCase().padStart(4, '0');
+          return crc.toString(16).toUpperCase().padStart(4, '0');
         }
         
         // Helper function to format EMV QR code data object
@@ -2216,7 +2219,8 @@
         }
         
         // Build Thai QR Code string according to EMV QR Code standard
-        const amountStr = amount.toFixed(2);
+        // For THB currency, use integer amount (no decimals) as per Thai QR standard
+        const amountStr = Math.round(amount).toString();
         
         // Determine PromptPay ID type and format
         let promptPayValue;
@@ -2242,8 +2246,10 @@
         qrData += formatEMVData('01', '12');
         
         // Merchant Account Information (38)
+        // Contains: GUID (00) + PromptPay ID (01)
         // AID: A000000677010111 (PromptPay)
-        const merchantInfo = '0016A000000677010111' + promptPayValue;
+        const guid = 'A000000677010111';
+        const merchantInfo = formatEMVData('00', guid) + formatEMVData('01', promptPayValue);
         qrData += formatEMVData('38', merchantInfo);
         
         // Transaction Currency (53) - THB = 764
@@ -2255,9 +2261,11 @@
         // Country Code (58) - TH = Thailand
         qrData += formatEMVData('58', 'TH');
         
-        // Calculate CRC (63) - CRC is calculated on data WITHOUT the CRC field
-        // Then append CRC field with the calculated value
-        const crc = calculateCRC16(qrData + '6304');
+        // Calculate CRC (63) 
+        // CRC is calculated on the data including CRC field ID and length (6304), but not the CRC value
+        // Then append the calculated CRC value
+        const dataForCRC = qrData + '6304';
+        const crc = calculateCRC16(dataForCRC);
         qrData += formatEMVData('63', crc);
         
         // Generate QR code with properly formatted Thai QR string
