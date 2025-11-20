@@ -1197,9 +1197,12 @@
         let attempts = 0;
         const maxAttempts = 3;
         const cdnUrls = [
-          'https://unpkg.com/qrcode@1.5.3/build/qrcode.min.js',
           'https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js',
-          'https://cdnjs.cloudflare.com/ajax/libs/qrcode/1.5.3/qrcode.min.js'
+          'https://unpkg.com/qrcode@1.5.3/build/qrcode.min.js',
+          'https://cdn.jsdelivr.net/npm/qrcode@1.5.3/qrcode.min.js',
+          'https://unpkg.com/qrcode@1.5.3/qrcode.min.js',
+          'https://cdnjs.cloudflare.com/ajax/libs/qrcode/1.5.3/qrcode.min.js',
+          'https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js'
         ];
         
         function checkQRCodeLibrary() {
@@ -1221,6 +1224,8 @@
         function loadQRCodeLibrary(urlIndex) {
           if (urlIndex >= cdnUrls.length) {
             DEBUG.error('✗ All CDNs failed to load QRCode library');
+            // Set a flag so we can use fallback
+            window.qrCodeLibraryFailed = true;
             return;
           }
           
@@ -1248,9 +1253,28 @@
             }, 100);
           };
           
-          script.onerror = function() {
-            DEBUG.warn('CDN failed:', cdnUrls[urlIndex]);
+          script.onerror = function(e) {
+            DEBUG.warn('CDN failed:', cdnUrls[urlIndex], e);
+            // Remove failed script
+            script.remove();
             loadQRCodeLibrary(urlIndex + 1);
+          };
+          
+          // Add timeout for script loading (10 seconds per CDN)
+          const timeout = setTimeout(function() {
+            if (!qrCodeLoaded) {
+              DEBUG.warn('CDN timeout:', cdnUrls[urlIndex]);
+              script.remove();
+              script.onerror = null; // Prevent double error
+              loadQRCodeLibrary(urlIndex + 1);
+            }
+          }, 10000);
+          
+          // Clear timeout if script loads successfully
+          const originalOnload = script.onload;
+          script.onload = function() {
+            clearTimeout(timeout);
+            if (originalOnload) originalOnload.call(this);
           };
           
           document.head.appendChild(script);
@@ -2073,6 +2097,37 @@
         }
       });
 
+      // Fallback payment display when QR code library fails
+      function showPaymentFallback(container, amount, packageName) {
+        const promptPayId = PAYMENT_CONFIG.promptPayId;
+        const merchantName = PAYMENT_CONFIG.merchantName;
+        
+        container.innerHTML = 
+          '<div style="padding: 20px; text-align: center; border: 2px solid #8b7355; border-radius: 8px; background: #f5f1e8;">' +
+          '<div style="font-size: 18px; font-weight: bold; color: #8b7355; margin-bottom: 15px;">ข้อมูลการชำระเงิน</div>' +
+          '<div style="font-size: 24px; font-weight: bold; color: #689f38; margin-bottom: 10px;">' + amount.toLocaleString() + ' ฿</div>' +
+          '<div style="margin: 15px 0; padding: 15px; background: white; border-radius: 6px;">' +
+          '<div style="color: #5d4037; margin-bottom: 8px;"><strong>PromptPay ID:</strong></div>' +
+          '<div style="font-size: 20px; font-weight: bold; color: #8b7355; letter-spacing: 2px; margin-bottom: 15px;">' + promptPayId + '</div>' +
+          '<div style="color: #5d4037; font-size: 14px; margin-top: 10px;">' +
+          'รับเงิน: ' + merchantName + '<br>' +
+          'แพ็กเกจ: ' + packageName +
+          '</div>' +
+          '</div>' +
+          '<div style="margin-top: 15px; padding: 12px; background: #fff3cd; border-radius: 6px; color: #856404; font-size: 13px;">' +
+          '💡 วิธีชำระเงิน:<br>' +
+          '1. เปิดแอปธนาคารของคุณ<br>' +
+          '2. เลือก "สแกน QR" หรือ "โอนเงิน"<br>' +
+          '3. สแกน QR Code หรือกรอก PromptPay ID<br>' +
+          '4. ตรวจสอบจำนวนเงินและยืนยัน' +
+          '</div>' +
+          '<div style="margin-top: 15px;">' +
+          '<button onclick="location.reload()" style="padding: 10px 20px; background: #8b7355; color: white; border: none; border-radius: 6px; cursor: pointer; margin-right: 10px;">ลองโหลด QR Code อีกครั้ง</button>' +
+          '<a href="tel:' + PAYMENT_CONFIG.contactPhone.replace(/-/g, '') + '" style="padding: 10px 20px; background: #689f38; color: white; text-decoration: none; border-radius: 6px; display: inline-block;">ติดต่อ: ' + PAYMENT_CONFIG.contactPhone + '</a>' +
+          '</div>' +
+          '</div>';
+      }
+
       // Generate Thai QR Code for PromptPay
       function generateThaiQRCode(amount, packageName) {
         DEBUG.log('Generating Thai QR Code for amount:', amount, 'package:', packageName);
@@ -2113,16 +2168,11 @@
               DEBUG.log('QRCode library loaded, generating QR code...');
               // Retry generating QR code
               setTimeout(() => generateThaiQRCode(amount, packageName), 100);
-            } else if (attempts >= maxAttempts) {
+            } else if (attempts >= maxAttempts || window.qrCodeLibraryFailed) {
               clearInterval(checkQRCode);
               DEBUG.error('QRCode library failed to load after 10 seconds');
-              qrContainer.innerHTML = 
-                '<div style="padding: 20px; color: #f57c00; text-align: center; border: 2px dashed #f57c00; border-radius: 8px;">' +
-                '⚠️ ไม่สามารถโหลด QR Code Library<br>' +
-                'กรุณารีเฟรชหน้าเว็บ<br>' +
-                'หรือติดต่อ: ' + PAYMENT_CONFIG.contactPhone + '<br>' +
-                '<button onclick="location.reload()" style="margin-top: 10px; padding: 8px 16px; background: #8b7355; color: white; border: none; border-radius: 6px; cursor: pointer;">รีเฟรชหน้าเว็บ</button>' +
-                '</div>';
+              // Fallback: Show payment information without QR code
+              showPaymentFallback(qrContainer, amount, packageName);
             }
           }, 100);
           return;
