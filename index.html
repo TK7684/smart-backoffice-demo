@@ -5,6 +5,7 @@
     <title>AI Smart Backoffice Demo | Google Sheets + AI</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://js.stripe.com/v3/"></script>
     <style>
       /* ====== Reset & Base ====== */
       * {
@@ -1055,7 +1056,7 @@
         </div>
         <div id="package-selection">
           <div style="margin-bottom: 24px; color: #5d4037; font-size: 14px; line-height: 1.6;">
-            <p>เลือกแพ็กเกจที่เหมาะกับธุรกิจของคุณ หลังจากเลือกแล้วจะแสดง QR Code สำหรับชำระเงิน</p>
+            <p>เลือกแพ็กเกจที่เหมาะกับธุรกิจของคุณ หลังจากเลือกแล้วจะแสดงหน้าชำระเงินผ่าน Stripe</p>
           </div>
           
           <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 24px;">
@@ -1113,34 +1114,31 @@
           </div>
         </div>
 
-        <!-- Payment QR Code Section -->
+        <!-- Payment Stripe Section -->
         <div id="payment-section" style="display: none;">
-          <!-- Step 1: QR Code Payment -->
-          <div id="payment-qr-step">
+          <!-- Step 1: Stripe Payment -->
+          <div id="payment-stripe-step">
             <div style="text-align: center; margin-bottom: 24px;">
-              <h3 style="color: #5d4037; margin-bottom: 12px;">ชำระเงินผ่าน QR Code</h3>
-              <div style="background: white; padding: 20px; border-radius: 12px; display: inline-block; margin-bottom: 16px; min-width: 250px;">
-                <div id="qrcode" style="margin-bottom: 12px; min-height: 200px; display: flex; align-items: center; justify-content: center;"></div>
+              <h3 style="color: #5d4037; margin-bottom: 12px;">ชำระเงินผ่าน Stripe</h3>
+              <div style="background: white; padding: 20px; border-radius: 12px; display: inline-block; margin-bottom: 16px; min-width: 300px;">
                 <div style="font-size: 18px; font-weight: bold; color: #5d4037; margin-bottom: 8px;" id="package-amount"></div>
-                <div style="font-size: 12px; color: #8b7355;" id="package-name"></div>
+                <div style="font-size: 12px; color: #8b7355; margin-bottom: 20px;" id="package-name"></div>
+                <div id="stripe-checkout-container" style="margin: 20px 0;">
+                  <button class="btn-submit" id="stripe-checkout-btn" style="max-width: 300px; margin: 0 auto; background: linear-gradient(135deg, #635bff, #5a52e5);">
+                    💳 ชำระเงินด้วย Stripe
+                  </button>
+                </div>
               </div>
               <div style="color: #5d4037; font-size: 14px; margin-bottom: 16px;">
-                <p><strong>ขั้นตอนที่ 1:</strong> สแกน QR Code เพื่อชำระเงิน</p>
-                <p style="font-size: 12px; color: #8b7355; margin-top: 8px;">กรุณาชำระเงินจำนวนที่แสดงด้านบน</p>
+                <p><strong>ขั้นตอนที่ 1:</strong> คลิกปุ่มด้านบนเพื่อชำระเงินผ่าน Stripe</p>
+                <p style="font-size: 12px; color: #8b7355; margin-top: 8px;">รองรับบัตรเครดิต/เดบิต และวิธีการชำระเงินอื่นๆ</p>
               </div>
-              <div style="margin-top: 20px;">
-                <button class="btn-submit" id="verify-payment-btn" style="max-width: 300px; margin: 0 auto;">
-                  ✓ ฉันชำระเงินแล้ว (ยืนยันการชำระเงิน)
-                </button>
+              <div id="payment-status" style="display: none; margin-top: 20px; padding: 12px; background: #e8f5e9; border-radius: 8px; color: #2e7d32;">
+                <p style="margin: 0;"><strong>✓ กำลังรอการยืนยันการชำระเงิน...</strong></p>
               </div>
               <div id="payment-error" style="display: none; margin-top: 16px; padding: 12px; background: #ffebee; border-radius: 8px; color: #c62828;">
-                <p style="margin-bottom: 8px;"><strong>⚠️ ไม่สามารถยืนยันการชำระเงินได้</strong></p>
-                <p style="font-size: 12px; margin-bottom: 12px;">กรุณาตรวจสอบว่า:</p>
-                <ul style="text-align: left; font-size: 12px; margin-left: 20px; margin-bottom: 12px;">
-                  <li>ชำระเงินจำนวนที่ถูกต้อง</li>
-                  <li>สแกน QR Code ถูกต้อง</li>
-                  <li>รอสักครู่แล้วลองอีกครั้ง</li>
-                </ul>
+                <p style="margin-bottom: 8px;"><strong>⚠️ เกิดข้อผิดพลาดในการชำระเงิน</strong></p>
+                <p style="font-size: 12px; margin-bottom: 12px;">กรุณาลองใหม่อีกครั้ง</p>
                 <button class="btn-submit" id="contact-support-btn" style="background: linear-gradient(135deg, #f57c00, #e65100); max-width: 250px;">
                   📧 ติดต่อเพื่อขอความช่วยเหลือ
                 </button>
@@ -1191,106 +1189,6 @@
     </div>
 
     <script>
-      // Load QRCode library with proper error handling
-      (function() {
-        let qrCodeLoaded = false;
-        let attempts = 0;
-        const maxAttempts = 3;
-        const cdnUrls = [
-          'https://cdn.jsdelivr.net/gh/davidshimjs/qrcodejs@gh-pages/qrcode.min.js',
-          'https://unpkg.com/qrcodejs@1.0.0/qrcode.min.js',
-          'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js',
-          'https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js',
-          'https://unpkg.com/qrcode@1.5.3/build/qrcode.min.js'
-        ];
-        
-        function checkQRCodeLibrary() {
-          // Check for qrcodejs (davidshimjs) - uses QRCode constructor
-          if (typeof QRCode !== 'undefined' && typeof QRCode === 'function') {
-            qrCodeLoaded = true;
-            DEBUG.log('✓ QRCode library (qrcodejs) loaded successfully');
-            return true;
-          }
-          // Check for qrcode npm package - uses QRCode.toCanvas
-          const qrCode = window.QRCode || window.qrcode;
-          if (qrCode && typeof qrCode.toCanvas === 'function') {
-            if (!window.QRCode) {
-              window.QRCode = qrCode;
-            }
-            qrCodeLoaded = true;
-            DEBUG.log('✓ QRCode library (qrcode npm) loaded successfully');
-            return true;
-          }
-          return false;
-        }
-        
-        function loadQRCodeLibrary(urlIndex) {
-          if (urlIndex >= cdnUrls.length) {
-            DEBUG.error('✗ All CDNs failed to load QRCode library');
-            // Set a flag so we can use fallback
-            window.qrCodeLibraryFailed = true;
-            return;
-          }
-          
-          const script = document.createElement('script');
-          script.src = cdnUrls[urlIndex];
-          script.async = true;
-          
-          script.onload = function() {
-            // Give it multiple moments to initialize (some CDNs need more time)
-            let checkAttempts = 0;
-            const maxCheckAttempts = 20; // 2 seconds total
-            
-            const checkInterval = setInterval(function() {
-              checkAttempts++;
-              if (checkQRCodeLibrary()) {
-                clearInterval(checkInterval);
-                // Library loaded successfully
-                return;
-              } else if (checkAttempts >= maxCheckAttempts) {
-                clearInterval(checkInterval);
-                // Try next CDN
-                DEBUG.warn('QRCode library loaded but not available after checks, trying next CDN...');
-                loadQRCodeLibrary(urlIndex + 1);
-              }
-            }, 100);
-          };
-          
-          script.onerror = function(e) {
-            DEBUG.warn('CDN failed:', cdnUrls[urlIndex], e);
-            // Remove failed script
-            script.remove();
-            loadQRCodeLibrary(urlIndex + 1);
-          };
-          
-          // Add timeout for script loading (10 seconds per CDN)
-          const timeout = setTimeout(function() {
-            if (!qrCodeLoaded) {
-              DEBUG.warn('CDN timeout:', cdnUrls[urlIndex]);
-              script.remove();
-              script.onerror = null; // Prevent double error
-              loadQRCodeLibrary(urlIndex + 1);
-            }
-          }, 10000);
-          
-          // Clear timeout if script loads successfully
-          const originalOnload = script.onload;
-          script.onload = function() {
-            clearTimeout(timeout);
-            if (originalOnload) originalOnload.call(this);
-          };
-          
-          document.head.appendChild(script);
-        }
-        
-        // Start loading
-        loadQRCodeLibrary(0);
-        
-        // Expose check function globally
-        window.checkQRCodeReady = function() {
-          return checkQRCodeLibrary();
-        };
-      })();
       // ===== Mock Data per shop type =====
       const DATA = {
         pet: {
@@ -1935,19 +1833,28 @@
       }
 
       // ===== Payment Configuration =====
-      // IMPORTANT: Update these settings with your actual payment account details
+      // IMPORTANT: Update these settings with your actual Stripe account details
       const PAYMENT_CONFIG = {
-        // Your PromptPay ID (phone number or National ID)
-        // Format: 10 digits (phone: 08XXXXXXXX) or 13 digits (National ID)
-        // Example: "0812345678" or "1234567890123"
-        promptPayId: "0644162478", // ⚠️ REPLACE WITH YOUR ACTUAL PROMPTPAY ID
+        // Your Stripe Publishable Key (from Stripe Dashboard)
+        // Get it from: https://dashboard.stripe.com/apikeys
+        stripePublishableKey: "pk_test_51...", // ⚠️ REPLACE WITH YOUR STRIPE PUBLISHABLE KEY
+        
+        // Your backend API endpoint to create Stripe Checkout sessions
+        // This should be your server endpoint that creates a Stripe Checkout Session
+        stripeCheckoutUrl: GOOGLE_SCRIPT_URL, // Using Google Apps Script as backend
         
         // Your merchant/business name (will appear in payment details)
         merchantName: "Ped Pro - เป็ดมือโปร",
         
-        // Your contact phone (displayed if QR code fails)
+        // Your contact phone (displayed if payment fails)
         contactPhone: "0644162478" // ⚠️ REPLACE WITH YOUR CONTACT PHONE
       };
+      
+      // Initialize Stripe
+      let stripe = null;
+      if (PAYMENT_CONFIG.stripePublishableKey && PAYMENT_CONFIG.stripePublishableKey !== "pk_test_51...") {
+        stripe = Stripe(PAYMENT_CONFIG.stripePublishableKey);
+      }
       
       // ===== Package Selection Modal =====
       const packageModal = document.getElementById("package-modal");
@@ -1990,14 +1897,15 @@
         packageModal.classList.remove("active");
         packageSelection.style.display = "block";
         paymentSection.style.display = "none";
-        document.getElementById("payment-qr-step").style.display = "block";
+        document.getElementById("payment-stripe-step").style.display = "block";
         document.getElementById("payment-form-step").style.display = "none";
         document.getElementById("payment-error").style.display = "none";
+        document.getElementById("payment-status").style.display = "none";
         packageForm.reset();
         selectedPackage = null;
         paymentVerified = false;
         verifiedAmount = null;
-        document.getElementById("qrcode").innerHTML = "";
+        stripeSessionId = null;
       }
 
       packageModalClose.addEventListener("click", closePackageModal);
@@ -2014,70 +1922,167 @@
           selectedPackage = packageType;
           const info = packageInfo[packageType];
           
-          // Hide selection, show payment QR step
+          // Hide selection, show payment Stripe step
           packageSelection.style.display = "none";
           paymentSection.style.display = "block";
-          document.getElementById("payment-qr-step").style.display = "block";
+          document.getElementById("payment-stripe-step").style.display = "block";
           document.getElementById("payment-form-step").style.display = "none";
           document.getElementById("payment-error").style.display = "none";
+          document.getElementById("payment-status").style.display = "none";
           
           // Update package info
           document.getElementById("package-amount").textContent = `${info.price.toLocaleString()} ฿`;
           document.getElementById("package-name").textContent = info.displayName;
-          
-          // Generate Thai QR Code for payment (with delay to ensure library is loaded)
-          setTimeout(() => {
-            generateThaiQRCode(info.price, info.name);
-          }, 100);
         });
       });
 
       // Payment verification
       let paymentVerified = false;
       let verifiedAmount = null;
+      let stripeSessionId = null;
       
-      function verifyPayment() {
+      // Handle Stripe Checkout button click
+      const stripeCheckoutBtn = document.getElementById("stripe-checkout-btn");
+      if (stripeCheckoutBtn) {
+        stripeCheckoutBtn.addEventListener("click", async () => {
+          if (!selectedPackage) {
+            alert("กรุณาเลือกแพ็กเกจก่อน");
+            return;
+          }
+          
+          if (!stripe) {
+            alert("Stripe ยังไม่ได้ตั้งค่า กรุณาติดต่อผู้ดูแลระบบ");
+            return;
+          }
+          
+          const info = packageInfo[selectedPackage];
+          const amount = info.price;
+          
+          // Disable button and show loading
+          stripeCheckoutBtn.disabled = true;
+          stripeCheckoutBtn.textContent = "กำลังสร้างหน้าชำระเงิน...";
+          
+          try {
+            // Create success and cancel URLs
+            const currentUrl = window.location.origin + window.location.pathname;
+            const successUrl = currentUrl + '?session_id={CHECKOUT_SESSION_ID}&payment_status=success';
+            const cancelUrl = currentUrl + '?payment_status=cancel';
+            
+            // Create Stripe Checkout Session via backend
+            const response = await fetch(PAYMENT_CONFIG.stripeCheckoutUrl, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                action: 'createStripeCheckout',
+                package: selectedPackage,
+                packageName: info.displayName,
+                amount: amount,
+                currency: 'thb',
+                successUrl: successUrl,
+                cancelUrl: cancelUrl
+              })
+            });
+            
+            const result = await response.json();
+            
+            if (result.success && result.sessionId) {
+              stripeSessionId = result.sessionId;
+              
+              // Redirect to Stripe Checkout
+              const checkoutResult = await stripe.redirectToCheckout({
+                sessionId: result.sessionId
+              });
+              
+              if (checkoutResult.error) {
+                throw new Error(checkoutResult.error.message);
+              }
+            } else {
+              throw new Error(result.error || 'Failed to create checkout session');
+            }
+          } catch (error) {
+            DEBUG.error('Stripe checkout error:', error);
+            stripeCheckoutBtn.disabled = false;
+            stripeCheckoutBtn.textContent = "💳 ชำระเงินด้วย Stripe";
+            document.getElementById("payment-error").style.display = "block";
+            alert("เกิดข้อผิดพลาดในการสร้างหน้าชำระเงิน กรุณาลองใหม่อีกครั้ง");
+          }
+        });
+      }
+      
+      // Check payment status from URL parameters (after Stripe redirect)
+      function checkPaymentStatus() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const sessionId = urlParams.get('session_id');
+        const paymentStatus = urlParams.get('payment_status');
+        
+        if (sessionId && paymentStatus === 'success') {
+          // Payment successful - verify with backend
+          verifyStripePayment(sessionId);
+        } else if (sessionId && paymentStatus === 'cancel') {
+          // Payment cancelled
+          document.getElementById("payment-error").style.display = "block";
+          document.getElementById("payment-status").style.display = "none";
+        }
+      }
+      
+      // Verify Stripe payment with backend
+      async function verifyStripePayment(sessionId) {
         if (!selectedPackage) {
-          alert("กรุณาเลือกแพ็กเกจก่อน");
           return;
         }
         
         const info = packageInfo[selectedPackage];
-        const expectedAmount = info.price;
         
-        // Show confirmation dialog
-        const confirmed = confirm(
-          `ยืนยันการชำระเงิน\n\n` +
-          `แพ็กเกจ: ${info.displayName}\n` +
-          `จำนวนเงิน: ${expectedAmount.toLocaleString()} ฿\n\n` +
-          `คุณได้ชำระเงินเรียบร้อยแล้วใช่หรือไม่?`
-        );
-        
-        if (!confirmed) {
-          return; // User cancelled
+        try {
+          const response = await fetch(PAYMENT_CONFIG.stripeCheckoutUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              action: 'verifyStripePayment',
+              sessionId: sessionId,
+              package: selectedPackage
+            })
+          });
+          
+          const result = await response.json();
+          
+          if (result.success && result.paid) {
+            // Payment verified - proceed to form
+            paymentVerified = true;
+            verifiedAmount = info.price;
+            stripeSessionId = sessionId;
+            
+            // Hide Stripe step, show form step
+            document.getElementById("payment-stripe-step").style.display = "none";
+            document.getElementById("payment-form-step").style.display = "block";
+            document.getElementById("payment-error").style.display = "none";
+            document.getElementById("payment-status").style.display = "none";
+            
+            // Clean URL
+            window.history.replaceState({}, document.title, window.location.pathname);
+            
+            DEBUG.log('Payment verified:', {
+              package: selectedPackage,
+              amount: verifiedAmount,
+              sessionId: sessionId,
+              status: 'Paid'
+            });
+          } else {
+            throw new Error(result.error || 'Payment verification failed');
+          }
+        } catch (error) {
+          DEBUG.error('Payment verification error:', error);
+          document.getElementById("payment-error").style.display = "block";
+          document.getElementById("payment-status").style.display = "none";
         }
-        
-        // Payment verified - proceed to form
-        paymentVerified = true;
-        verifiedAmount = expectedAmount;
-        
-        // Hide QR step, show form step
-        document.getElementById("payment-qr-step").style.display = "none";
-        document.getElementById("payment-form-step").style.display = "block";
-        document.getElementById("payment-error").style.display = "none";
-        
-        DEBUG.log('Payment verified:', {
-          package: selectedPackage,
-          amount: verifiedAmount,
-          status: 'Verified'
-        });
       }
       
-      // Attach event listener to verify button
-      const verifyBtn = document.getElementById("verify-payment-btn");
-      if (verifyBtn) {
-        verifyBtn.addEventListener("click", verifyPayment);
-      }
+      // Check payment status on page load
+      checkPaymentStatus();
       
       // Handle payment error contact support
       document.addEventListener("click", (e) => {
@@ -2094,419 +2099,7 @@
           const email = 'tripetkk@gmail.com';
           window.location.href = `mailto:${email}?subject=${subject}&body=${body}`;
         }
-        
-        if (e.target && e.target.id === "retry-payment-btn") {
-          document.getElementById("payment-error").style.display = "none";
-        }
       });
-
-      // Fallback payment display when QR code library fails
-      function showPaymentFallback(container, amount, packageName) {
-        const promptPayId = PAYMENT_CONFIG.promptPayId;
-        const merchantName = PAYMENT_CONFIG.merchantName;
-        
-        container.innerHTML = 
-          '<div style="padding: 20px; text-align: center; border: 2px solid #8b7355; border-radius: 8px; background: #f5f1e8;">' +
-          '<div style="font-size: 18px; font-weight: bold; color: #8b7355; margin-bottom: 15px;">ข้อมูลการชำระเงิน</div>' +
-          '<div style="font-size: 24px; font-weight: bold; color: #689f38; margin-bottom: 10px;">' + amount.toLocaleString() + ' ฿</div>' +
-          '<div style="margin: 15px 0; padding: 15px; background: white; border-radius: 6px;">' +
-          '<div style="color: #5d4037; margin-bottom: 8px;"><strong>PromptPay ID:</strong></div>' +
-          '<div style="font-size: 20px; font-weight: bold; color: #8b7355; letter-spacing: 2px; margin-bottom: 15px;">' + promptPayId + '</div>' +
-          '<div style="color: #5d4037; font-size: 14px; margin-top: 10px;">' +
-          'รับเงิน: ' + merchantName + '<br>' +
-          'แพ็กเกจ: ' + packageName +
-          '</div>' +
-          '</div>' +
-          '<div style="margin-top: 15px; padding: 12px; background: #fff3cd; border-radius: 6px; color: #856404; font-size: 13px;">' +
-          '💡 วิธีชำระเงิน:<br>' +
-          '1. เปิดแอปธนาคารของคุณ<br>' +
-          '2. เลือก "สแกน QR" หรือ "โอนเงิน"<br>' +
-          '3. สแกน QR Code หรือกรอก PromptPay ID<br>' +
-          '4. ตรวจสอบจำนวนเงินและยืนยัน' +
-          '</div>' +
-          '<div style="margin-top: 15px;">' +
-          '<button onclick="location.reload()" style="padding: 10px 20px; background: #8b7355; color: white; border: none; border-radius: 6px; cursor: pointer; margin-right: 10px;">ลองโหลด QR Code อีกครั้ง</button>' +
-          '<a href="tel:' + PAYMENT_CONFIG.contactPhone.replace(/-/g, '') + '" style="padding: 10px 20px; background: #689f38; color: white; text-decoration: none; border-radius: 6px; display: inline-block;">ติดต่อ: ' + PAYMENT_CONFIG.contactPhone + '</a>' +
-          '</div>' +
-          '</div>';
-      }
-
-      // Generate Thai QR Code for PromptPay
-      function generateThaiQRCode(amount, packageName) {
-        DEBUG.log('Generating Thai QR Code for amount:', amount, 'package:', packageName);
-        DEBUG.log('Using PromptPay ID:', PAYMENT_CONFIG.promptPayId);
-        
-        const qrContainer = document.getElementById("qrcode");
-        qrContainer.innerHTML = '<div style="padding: 20px; text-align: center; color: #8b7355;">กำลังสร้าง QR Code...</div>';
-        
-        // Validate PromptPay ID
-        if (!PAYMENT_CONFIG.promptPayId || PAYMENT_CONFIG.promptPayId.length < 10) {
-          DEBUG.warn('⚠️ WARNING: PromptPay ID not configured properly!');
-          qrContainer.innerHTML = 
-            '<div style="padding: 20px; color: #f57c00; text-align: center; border: 2px dashed #f57c00; border-radius: 8px;">' +
-            '⚠️ กรุณาติดต่อเพื่อชำระเงิน<br>' +
-            'โทร: ' + PAYMENT_CONFIG.contactPhone + '<br>' +
-            '<small style="color: #8b7355;">(QR Code ยังไม่ได้ตั้งค่า)</small>' +
-            '</div>';
-          return;
-        }
-        
-        // Check if QRCode library is loaded - wait a bit if not ready
-        function isQRCodeReady() {
-          // Check for qrcodejs (constructor function)
-          if (typeof QRCode === 'function') {
-            return true;
-          }
-          // Check for qrcode npm (toCanvas method)
-          const qrCode = window.QRCode || window.qrcode || (typeof QRCode !== 'undefined' ? QRCode : null);
-          return qrCode && typeof qrCode.toCanvas === 'function';
-        }
-        
-        if (!isQRCodeReady()) {
-          DEBUG.warn('QRCode library not loaded yet, waiting...');
-          qrContainer.innerHTML = '<div style="padding: 20px; text-align: center; color: #8b7355;">กำลังโหลด QR Code Library...</div>';
-          
-          // Wait for library to load (max 10 seconds)
-          let attempts = 0;
-          const maxAttempts = 100; // 10 seconds
-          const checkQRCode = setInterval(() => {
-            attempts++;
-            if (isQRCodeReady()) {
-              clearInterval(checkQRCode);
-              DEBUG.log('QRCode library loaded, generating QR code...');
-              // Retry generating QR code
-              setTimeout(() => generateThaiQRCode(amount, packageName), 100);
-            } else if (attempts >= maxAttempts || window.qrCodeLibraryFailed) {
-              clearInterval(checkQRCode);
-              DEBUG.error('QRCode library failed to load after 10 seconds');
-              // Fallback: Show payment information without QR code
-              showPaymentFallback(qrContainer, amount, packageName);
-            }
-          }, 100);
-          return;
-        }
-        
-        const promptPayId = PAYMENT_CONFIG.promptPayId;
-        const merchantName = PAYMENT_CONFIG.merchantName;
-        
-        // Generate QR Code using KBank API via Google Apps Script
-        // This ensures 100% compatibility with Thai banking apps
-        DEBUG.log('Requesting QR Code from KBank API via Google Apps Script...');
-        
-        fetch(GOOGLE_SCRIPT_URL, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            action: 'generateQRCode',
-            amount: amount,
-            reference1: 'PAYMENT',
-            reference2: packageName || '',
-            reference3: 'PAYMENT',
-            reference4: ''
-          })
-        })
-        .then(response => response.json())
-        .then(result => {
-          if (result.success && result.qrData) {
-            DEBUG.log('✓ QR Code generated successfully using KBank API');
-            DEBUG.log('QR Data:', result.qrData);
-            
-            // Display the QR code
-            displayQRCode(result.qrData, amount, merchantName);
-          } else {
-            DEBUG.error('Failed to generate QR code:', result.error || 'Unknown error');
-            qrContainer.innerHTML = 
-              '<div style="padding: 20px; color: #f57c00; text-align: center; border: 2px dashed #f57c00; border-radius: 8px;">' +
-              '⚠️ ไม่สามารถสร้าง QR Code ได้<br>' +
-              (result.error || 'เกิดข้อผิดพลาดในการเชื่อมต่อกับ KBank API') + '<br>' +
-              'กรุณาติดต่อ: ' + PAYMENT_CONFIG.contactPhone +
-              '</div>';
-          }
-        })
-        .catch(error => {
-          DEBUG.error('Error calling KBank API:', error);
-          qrContainer.innerHTML = 
-            '<div style="padding: 20px; color: #f57c00; text-align: center; border: 2px dashed #f57c00; border-radius: 8px;">' +
-            '⚠️ เกิดข้อผิดพลาดในการเชื่อมต่อ<br>' +
-            'กรุณาติดต่อ: ' + PAYMENT_CONFIG.contactPhone +
-            '</div>';
-        });
-        
-        return; // Exit early, QR code will be displayed in the fetch callback
-        
-        // Function to display QR code (called after receiving from API)
-        function displayQRCode(qrString, amount, merchantName) {
-          const qrContainer = document.getElementById("qrcode");
-          qrContainer.innerHTML = "";
-          
-          // Check if QRCode library is loaded
-          function isQRCodeReady() {
-            if (typeof QRCode === 'function') {
-              return true;
-            }
-            const qrCode = window.QRCode || window.qrcode || (typeof QRCode !== 'undefined' ? QRCode : null);
-            return qrCode && typeof qrCode.toCanvas === 'function';
-          }
-          
-          if (!isQRCodeReady()) {
-            DEBUG.warn('QRCode library not loaded, waiting...');
-            let attempts = 0;
-            const maxAttempts = 50;
-            const checkInterval = setInterval(() => {
-              attempts++;
-              if (isQRCodeReady()) {
-                clearInterval(checkInterval);
-                displayQRCode(qrString, amount, merchantName);
-              } else if (attempts >= maxAttempts) {
-                clearInterval(checkInterval);
-                showPaymentFallback(qrContainer, amount, packageName);
-              }
-            }, 100);
-            return;
-          }
-          
-          // Generate QR code visual
-          try {
-            if (typeof QRCode === 'function') {
-              DEBUG.log('Using qrcodejs library');
-              const qrDiv = document.createElement('div');
-              qrDiv.id = 'qrcode-' + Date.now();
-              qrContainer.appendChild(qrDiv);
-              
-              new QRCode(qrDiv, {
-                text: qrString,
-                width: 250,
-                height: 250,
-                colorDark: '#000000',
-                colorLight: '#FFFFFF',
-                correctLevel: QRCode.CorrectLevel.M
-              });
-              
-              DEBUG.log('QR Code displayed successfully');
-              // Add payment details below QR
-              const paymentDetails = document.createElement('div');
-              paymentDetails.style.cssText = 'margin-top: 12px; font-size: 12px; color: #8b7355; text-align: center;';
-              paymentDetails.innerHTML = `จำนวนเงิน: <strong>${amount.toLocaleString()} ฿</strong><br>รับเงิน: ${merchantName}`;
-              qrContainer.appendChild(paymentDetails);
-            } else if (typeof QRCode !== 'undefined' && typeof QRCode.toCanvas === 'function') {
-              DEBUG.log('Using qrcode npm library');
-              const canvas = document.createElement('canvas');
-              qrContainer.appendChild(canvas);
-              
-              QRCode.toCanvas(canvas, qrString, {
-                width: 250,
-                margin: 2,
-                color: {
-                  dark: '#000000',
-                  light: '#FFFFFF'
-                },
-                errorCorrectionLevel: 'M'
-              }, function (error) {
-                if (error) {
-                  DEBUG.error('QR Code generation error:', error);
-                  showPaymentFallback(qrContainer, amount, packageName);
-                } else {
-                  DEBUG.log('QR Code displayed successfully');
-                  const paymentDetails = document.createElement('div');
-                  paymentDetails.style.cssText = 'margin-top: 12px; font-size: 12px; color: #8b7355; text-align: center;';
-                  paymentDetails.innerHTML = `จำนวนเงิน: <strong>${amount.toLocaleString()} ฿</strong><br>รับเงิน: ${merchantName}`;
-                  qrContainer.appendChild(paymentDetails);
-                }
-              });
-            } else {
-              throw new Error('QRCode library not available');
-            }
-          } catch (err) {
-            DEBUG.error('Error displaying QR code:', err);
-            showPaymentFallback(qrContainer, amount, packageName);
-          }
-        }
-        
-        // Keep THAI_QRCODE library for fallback (not used in main flow)
-        const THAI_QRCODE = (function() {
-          'use strict';
-          
-          // CRC-16/CCITT-FALSE calculation
-          // Based on EMV QR Code standard and pypromptpay implementation
-          function calculateCRC16(data) {
-            let crc = 0xFFFF;
-            const polynomial = 0x1021;
-            
-            // Convert string to bytes for CRC calculation
-            for (let i = 0; i < data.length; i++) {
-              const byte = data.charCodeAt(i);
-              crc ^= (byte << 8);
-              
-              for (let j = 0; j < 8; j++) {
-                if (crc & 0x8000) {
-                  crc = ((crc << 1) ^ polynomial) & 0xFFFF;
-                } else {
-                  crc = (crc << 1) & 0xFFFF;
-                }
-              }
-            }
-            
-            // Return as 4-digit uppercase hex string
-            return (crc & 0xFFFF).toString(16).toUpperCase().padStart(4, '0');
-          }
-          
-          // Format EMV QR code data object (ID + Length + Value)
-          function formatEMVData(id, value) {
-            const length = value.length.toString().padStart(2, '0');
-            return id + length + value;
-          }
-          
-          // Format PromptPay ID according to Thai QR standard
-          // Based on EMV QR Code and PromptPay specification
-          // For phone numbers: Tag 01 with value "01130066" + phone number
-          // For national ID: Tag 01 with value "01130066" + national ID
-          function formatPromptPayID(promptPayId) {
-            // Remove any non-digit characters
-            const cleanId = promptPayId.replace(/\D/g, '');
-            
-            // PromptPay uses "01130066" as the prefix for both phone and national ID
-            // This is the PromptPay AID (Application Identifier)
-            const promptPayPrefix = '01130066';
-            
-            if (cleanId.length === 10) {
-              // Phone number (10 digits) - format: prefix + phone
-              return promptPayPrefix + cleanId;
-            } else if (cleanId.length === 13) {
-              // National ID (13 digits) - format: prefix + national ID
-              return promptPayPrefix + cleanId;
-            } else if (cleanId.length < 10) {
-              // Pad to 10 digits (treat as phone number)
-              const paddedId = cleanId.padStart(10, '0');
-              return promptPayPrefix + paddedId;
-            } else {
-              // If longer than 13, use first 13 digits (treat as national ID)
-              return promptPayPrefix + cleanId.substring(0, 13);
-            }
-          }
-          
-          // Generate Thai QR Code string
-          // Parameters:
-          //   promptPayId: string - PromptPay ID (phone number or national ID)
-          //   amount: number - Transaction amount (will be rounded to integer for THB)
-          //   options: object - Optional configuration
-          //     - static: boolean - Use static QR (default: false, uses dynamic)
-          function generate(promptPayId, amount, options = {}) {
-            if (!promptPayId || promptPayId.length < 10) {
-              throw new Error('PromptPay ID must be at least 10 digits');
-            }
-            
-            if (!amount || amount <= 0) {
-              throw new Error('Amount must be greater than 0');
-            }
-            
-            // For THB currency, use integer amount (no decimals)
-            const amountStr = Math.round(amount).toString();
-            
-            // Format PromptPay ID
-            const promptPayValue = formatPromptPayID(promptPayId);
-            
-            // Build EMV QR Code data
-            let qrData = '';
-            
-            // Payload Format Indicator (00) - Always '01' for EMV QR Code
-            qrData += formatEMVData('00', '01');
-            
-            // Point of Initiation Method (01)
-            // '11' = static QR code (no amount)
-            // '12' = dynamic QR code (with amount)
-            const poiMethod = (options.static || amount === 0) ? '11' : '12';
-            qrData += formatEMVData('01', poiMethod);
-            
-            // Merchant Account Information (38)
-            // Contains: GUID (00) + PromptPay ID (01)
-            // AID: A000000677010111 (PromptPay)
-            const guid = 'A000000677010111';
-            const merchantInfo = formatEMVData('00', guid) + formatEMVData('01', promptPayValue);
-            qrData += formatEMVData('38', merchantInfo);
-            
-            // Transaction Currency (53) - THB = 764
-            qrData += formatEMVData('53', '0764');
-            
-            // Transaction Amount (54) - Only include if dynamic QR
-            if (poiMethod === '12') {
-              qrData += formatEMVData('54', amountStr);
-            }
-            
-            // Country Code (58) - TH = Thailand
-            qrData += formatEMVData('58', 'TH');
-            
-            // Calculate CRC (63)
-            // According to EMV QR Code standard:
-            // 1. Build data string up to (but not including) CRC field
-            // 2. Append CRC field ID and length: "6304"
-            // 3. Calculate CRC on this string
-            // 4. Append CRC field with calculated value
-            const dataForCRC = qrData + '6304';
-            const crcValue = calculateCRC16(dataForCRC);
-            qrData += formatEMVData('63', crcValue);
-            
-            // Debug: Log CRC calculation details
-            if (typeof DEBUG !== 'undefined' && DEBUG.log) {
-              DEBUG.log('CRC Calculation:', {
-                dataForCRC: dataForCRC,
-                calculatedCRC: crcValue,
-                finalQRString: qrData
-              });
-            }
-            
-            return qrData;
-          }
-          
-          // Validate QR code format (for debugging)
-          function validateQRString(qrString) {
-            const issues = [];
-            
-            // Check if starts with Payload Format Indicator
-            if (!qrString.startsWith('000201')) {
-              issues.push('Missing or incorrect Payload Format Indicator');
-            }
-            
-            // Check if contains required fields
-            if (!qrString.includes('5304')) {
-              issues.push('Missing Currency field');
-            }
-            if (!qrString.includes('5802TH')) {
-              issues.push('Missing Country Code field');
-            }
-            if (!qrString.match(/6304[0-9A-F]{4}$/)) {
-              issues.push('Missing or invalid CRC field');
-            }
-            
-            // Extract and verify CRC
-            const crcMatch = qrString.match(/6304([0-9A-F]{4})$/);
-            if (crcMatch) {
-              const dataForCRC = qrString.substring(0, qrString.length - 6) + '6304';
-              const calculatedCRC = calculateCRC16(dataForCRC);
-              const providedCRC = crcMatch[1];
-              
-              if (calculatedCRC !== providedCRC) {
-                issues.push(`CRC mismatch: calculated=${calculatedCRC}, provided=${providedCRC}`);
-              }
-            }
-            
-            return {
-              valid: issues.length === 0,
-              issues: issues
-            };
-          }
-          
-          // Public API
-          return {
-            generate: generate,
-            calculateCRC16: calculateCRC16,
-            formatEMVData: formatEMVData,
-            formatPromptPayID: formatPromptPayID,
-            validateQRString: validateQRString
-          };
-        })();
-      }
 
       // Package form submission
       packageForm.addEventListener("submit", (e) => {
@@ -2540,7 +2133,8 @@
           packageName: packageInfo[selectedPackage].displayName,
           packagePrice: packageInfo[selectedPackage].price,
           verifiedAmount: verifiedAmount,
-          paymentStatus: "Verified",
+          paymentStatus: "Paid",
+          stripeSessionId: stripeSessionId,
           timestamp: new Date().toISOString()
         };
         

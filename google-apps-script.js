@@ -20,139 +20,154 @@ const SPREADSHEET_ID = '1AASP5TVxS_uTH0Ei13yJGUOZYYkgSxkOHYfUjLlOZ2M';
 const NOTIFICATION_EMAIL = 'tripetkk@gmail.com';
 const SHEET_NAME = 'Leads'; // Sheet name where data will be saved
 
-// KBank API Configuration
-// Update these with your actual KBank API credentials
-const KBANK_CONFIG = {
-  // OAuth Credentials (from KBank API portal)
-  CONSUMER_ID: '6HGlv0Gg0qMoF3wtJy1AFmj29BgevRlo',
-  CONSUMER_SECRET: 'cWkvogpBGSXeSmGN',
+// Stripe Configuration
+// IMPORTANT: You need a backend server to securely handle Stripe API calls
+// Google Apps Script cannot directly call Stripe API with secret keys
+// Options:
+// 1. Use a backend server (Node.js, Python, etc.) that calls Stripe API
+// 2. Use Stripe's serverless functions (AWS Lambda, Google Cloud Functions, etc.)
+// 3. Use a service like Zapier or Make.com to connect Stripe with Google Sheets
+//
+// For this implementation, we'll proxy requests to a backend endpoint
+// Update BACKEND_URL with your backend server URL
+const STRIPE_CONFIG = {
+  // Your backend server URL that handles Stripe API calls
+  // This backend should have your Stripe Secret Key
+  BACKEND_URL: 'https://your-backend-server.com/api/stripe', // ⚠️ REPLACE WITH YOUR BACKEND URL
   
-  // Partner Credentials (from exercises - use test values or your own)
-  PARTNER_ID: 'PTR1051673',
-  PARTNER_SECRET: 'd4bded59200547bc85903574a293831b',
-  MERCHANT_ID: 'KB102057149704',
-  
-  // API Base URLs
-  OAUTH_URL: 'https://openapi-sandbox.kasikornbank.com/v2/oauth/token',
-  QR_REQUEST_URL: 'https://openapi-sandbox.kasikornbank.com/v1/qrpayment/request'
+  // Alternative: If using a service like Zapier/Make.com webhook
+  WEBHOOK_URL: '' // Optional: Webhook URL for payment notifications
 };
 
-// Cache for access token (expires in ~29 minutes)
-let cachedAccessToken = null;
-let tokenExpiryTime = null;
-
 /**
- * Get KBank OAuth Access Token
+ * Create Stripe Checkout Session
+ * This function proxies the request to your backend server
+ * Your backend should:
+ * 1. Create a Stripe Checkout Session using Stripe API
+ * 2. Return the session ID to the frontend
  */
-function getKBankAccessToken() {
+function createStripeCheckoutSession(packageData) {
   try {
-    // Check if we have a valid cached token
-    if (cachedAccessToken && tokenExpiryTime && new Date() < tokenExpiryTime) {
-      Logger.log('Using cached access token');
-      return cachedAccessToken;
+    Logger.log('Creating Stripe Checkout Session for package: ' + packageData.package);
+    
+    // If no backend URL configured, return error
+    if (!STRIPE_CONFIG.BACKEND_URL || STRIPE_CONFIG.BACKEND_URL === 'https://your-backend-server.com/api/stripe') {
+      Logger.log('ERROR: Backend URL not configured');
+      return {
+        success: false,
+        error: 'Stripe backend not configured. Please set up a backend server to handle Stripe API calls.'
+      };
     }
     
-    Logger.log('Requesting new KBank access token...');
-    
-    // Create Basic Auth header
-    const credentials = Utilities.base64Encode(
-      KBANK_CONFIG.CONSUMER_ID + ':' + KBANK_CONFIG.CONSUMER_SECRET
-    );
-    
-    const options = {
-      method: 'post',
-      headers: {
-        'Authorization': 'Basic ' + credentials,
-        'Content-Type': 'application/x-www-form-urlencoded'
-      },
-      payload: 'grant_type=client_credentials'
-    };
-    
-    const response = UrlFetchApp.fetch(KBANK_CONFIG.OAUTH_URL, options);
-    const responseData = JSON.parse(response.getContentText());
-    
-    if (responseData.access_token) {
-      cachedAccessToken = responseData.access_token;
-      // Set expiry time (token expires in ~29 minutes, use 25 minutes for safety)
-      tokenExpiryTime = new Date(Date.now() + (25 * 60 * 1000));
-      Logger.log('Successfully obtained KBank access token');
-      return cachedAccessToken;
-    } else {
-      throw new Error('Failed to get access token: ' + JSON.stringify(responseData));
-    }
-  } catch (error) {
-    Logger.log('Error getting KBank access token: ' + error.toString());
-    throw error;
-  }
-}
-
-/**
- * Generate Thai QR Code using KBank API
- */
-function generateKBankQRCode(amount, reference1, reference2, reference3, reference4) {
-  try {
-    Logger.log('Generating KBank QR Code for amount: ' + amount);
-    
-    // Get access token
-    const accessToken = getKBankAccessToken();
-    
-    // Generate unique transaction ID
-    const partnerTxnUid = 'TXN' + Date.now() + Math.floor(Math.random() * 1000);
-    const requestTime = new Date().toISOString();
-    
-    // Prepare request body
+    // Prepare request to backend
     const requestBody = {
-      partnerTxnUid: partnerTxnUid,
-      partnerId: KBANK_CONFIG.PARTNER_ID,
-      partnerSecret: KBANK_CONFIG.PARTNER_SECRET,
-      requestDt: requestTime,
-      merchantId: KBANK_CONFIG.MERCHANT_ID,
-      qrType: 3, // Thai QR Code
-      txnAmount: Math.round(amount), // Integer format for THB
-      txnCurrencyCode: 'THB',
-      reference1: reference1 || 'PAYMENT',
-      reference2: reference2 || '',
-      reference3: reference3 || '',
-      reference4: reference4 || ''
+      action: 'createCheckoutSession',
+      package: packageData.package,
+      packageName: packageData.packageName,
+      amount: packageData.amount,
+      currency: packageData.currency || 'thb',
+      successUrl: packageData.successUrl || '',
+      cancelUrl: packageData.cancelUrl || ''
     };
     
     const options = {
       method: 'post',
       headers: {
-        'Authorization': 'Bearer ' + accessToken,
-        'Content-Type': 'application/json',
-        'x-test-mode': 'true',
-        'env-id': 'QR002'
+        'Content-Type': 'application/json'
       },
       payload: JSON.stringify(requestBody)
     };
     
-    const response = UrlFetchApp.fetch(KBANK_CONFIG.QR_REQUEST_URL, options);
+    const response = UrlFetchApp.fetch(STRIPE_CONFIG.BACKEND_URL + '/create-session', options);
     const responseData = JSON.parse(response.getContentText());
     
-    if (response.getResponseCode() === 200 || response.getResponseCode() === 201) {
-      Logger.log('Successfully generated KBank QR Code');
+    if (response.getResponseCode() === 200 && responseData.sessionId) {
+      Logger.log('Successfully created Stripe Checkout Session');
       return {
         success: true,
-        qrData: responseData.qrData || responseData.data?.qrData,
-        partnerTxnUid: partnerTxnUid,
-        data: responseData
+        sessionId: responseData.sessionId,
+        url: responseData.url // Optional: direct checkout URL
       };
     } else {
-      Logger.log('Failed to generate QR code. Status: ' + response.getResponseCode());
+      Logger.log('Failed to create Stripe Checkout Session. Status: ' + response.getResponseCode());
       Logger.log('Response: ' + JSON.stringify(responseData));
       return {
         success: false,
-        error: responseData.errorDesc || responseData.message || 'Unknown error',
-        status: response.getResponseCode(),
-        data: responseData
+        error: responseData.error || 'Unknown error',
+        status: response.getResponseCode()
       };
     }
   } catch (error) {
-    Logger.log('Error generating KBank QR Code: ' + error.toString());
+    Logger.log('Error creating Stripe Checkout Session: ' + error.toString());
     return {
       success: false,
       error: error.toString()
+    };
+  }
+}
+
+/**
+ * Verify Stripe Payment
+ * This function verifies payment status with your backend
+ * Your backend should:
+ * 1. Retrieve the Stripe Checkout Session using session ID
+ * 2. Check payment status
+ * 3. Return payment verification result
+ */
+function verifyStripePayment(sessionId, packageData) {
+  try {
+    Logger.log('Verifying Stripe payment for session: ' + sessionId);
+    
+    // If no backend URL configured, return error
+    if (!STRIPE_CONFIG.BACKEND_URL || STRIPE_CONFIG.BACKEND_URL === 'https://your-backend-server.com/api/stripe') {
+      Logger.log('ERROR: Backend URL not configured');
+      return {
+        success: false,
+        error: 'Stripe backend not configured. Please set up a backend server to handle Stripe API calls.'
+      };
+    }
+    
+    // Prepare request to backend
+    const requestBody = {
+      action: 'verifyPayment',
+      sessionId: sessionId,
+      package: packageData.package || ''
+    };
+    
+    const options = {
+      method: 'post',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      payload: JSON.stringify(requestBody)
+    };
+    
+    const response = UrlFetchApp.fetch(STRIPE_CONFIG.BACKEND_URL + '/verify-payment', options);
+    const responseData = JSON.parse(response.getContentText());
+    
+    if (response.getResponseCode() === 200) {
+      Logger.log('Payment verification result: ' + JSON.stringify(responseData));
+      return {
+        success: true,
+        paid: responseData.paid || false,
+        amount: responseData.amount,
+        currency: responseData.currency,
+        customerEmail: responseData.customerEmail
+      };
+    } else {
+      Logger.log('Failed to verify payment. Status: ' + response.getResponseCode());
+      return {
+        success: false,
+        error: responseData.error || 'Unknown error',
+        paid: false
+      };
+    }
+  } catch (error) {
+    Logger.log('Error verifying Stripe payment: ' + error.toString());
+    return {
+      success: false,
+      error: error.toString(),
+      paid: false
     };
   }
 }
@@ -194,18 +209,30 @@ function doPost(e) {
       Logger.log('Constructed data object: ' + JSON.stringify(data));
     }
     
-    // Check if this is a QR code generation request
-    if (data.action === 'generateQRCode' || data.type === 'qrCode') {
-      Logger.log('QR Code generation request detected');
-      const qrResult = generateKBankQRCode(
-        data.amount || 0,
-        data.reference1 || 'PAYMENT',
-        data.reference2 || '',
-        data.reference3 || '',
-        data.reference4 || ''
-      );
+    // Check if this is a Stripe Checkout Session creation request
+    if (data.action === 'createStripeCheckout') {
+      Logger.log('Stripe Checkout Session creation request detected');
+      const checkoutResult = createStripeCheckoutSession({
+        package: data.package,
+        packageName: data.packageName,
+        amount: data.amount,
+        currency: data.currency || 'thb',
+        successUrl: data.successUrl || '',
+        cancelUrl: data.cancelUrl || ''
+      });
       
-      return ContentService.createTextOutput(JSON.stringify(qrResult))
+      return ContentService.createTextOutput(JSON.stringify(checkoutResult))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    
+    // Check if this is a Stripe payment verification request
+    if (data.action === 'verifyStripePayment') {
+      Logger.log('Stripe payment verification request detected');
+      const verificationResult = verifyStripePayment(data.sessionId, {
+        package: data.package || ''
+      });
+      
+      return ContentService.createTextOutput(JSON.stringify(verificationResult))
         .setMimeType(ContentService.MimeType.JSON);
     }
     
