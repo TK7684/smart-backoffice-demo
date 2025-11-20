@@ -2189,19 +2189,82 @@
         const promptPayId = PAYMENT_CONFIG.promptPayId;
         const merchantName = PAYMENT_CONFIG.merchantName;
         
-        // Thai QR Payment String (Thai QR Standard format)
-        // Format: 00020101021243000016A00000067701011101130066XXXXXXXXXX5802TH5303764540XX.XX5404XX.XX6304XXXX
-        // Note: This is a simplified version. For production, use proper Thai QR code library
-        // Reference: https://developer.scb.co.th/#/documents/documentation/qr-payment/thai-qr.html
+        // Thai QR Payment String (Thai QR Standard format - EMV QR Code)
+        // Reference: https://github.com/suphakin-th/THAI_QRCODE
+        // Format: Payload Format Indicator + Point of Initiation + Merchant Account Info + Currency + Amount + Country + CRC
         
-        // Build Thai QR Code string
+        // Helper function to calculate CRC-16/CCITT-FALSE checksum
+        function calculateCRC16(data) {
+          let crc = 0xFFFF;
+          for (let i = 0; i < data.length; i++) {
+            crc ^= data.charCodeAt(i) << 8;
+            for (let j = 0; j < 8; j++) {
+              if (crc & 0x8000) {
+                crc = (crc << 1) ^ 0x1021;
+              } else {
+                crc = crc << 1;
+              }
+            }
+          }
+          return (crc & 0xFFFF).toString(16).toUpperCase().padStart(4, '0');
+        }
+        
+        // Helper function to format EMV QR code data object
+        function formatEMVData(id, value) {
+          const length = value.length.toString().padStart(2, '0');
+          return id + length + value;
+        }
+        
+        // Build Thai QR Code string according to EMV QR Code standard
         const amountStr = amount.toFixed(2);
-        // Pad PromptPay ID to proper length (10 digits for phone, 13 for National ID)
-        const paddedPromptPayId = promptPayId.padStart(13, '0');
-        const qrData = `00020101021243000016A00000067701011101130066${paddedPromptPayId}5802TH5303764540${amountStr}5404${amountStr}6304`;
         
-        // Generate QR code with Thai QR format string
-        const qrString = qrData; // Use the actual Thai QR format string
+        // Determine PromptPay ID type and format
+        let promptPayValue;
+        if (promptPayId.length === 10) {
+          // Phone number (10 digits)
+          promptPayValue = '01130066' + promptPayId;
+        } else if (promptPayId.length === 13) {
+          // National ID (13 digits)
+          promptPayValue = '01130066' + promptPayId;
+        } else {
+          // Default: treat as phone number and pad
+          const paddedId = promptPayId.padStart(10, '0');
+          promptPayValue = '01130066' + paddedId;
+        }
+        
+        // Build EMV QR Code data
+        let qrData = '';
+        
+        // Payload Format Indicator (00)
+        qrData += formatEMVData('00', '01');
+        
+        // Point of Initiation Method (01) - 11 = static, 12 = dynamic
+        qrData += formatEMVData('01', '12');
+        
+        // Merchant Account Information (38)
+        // AID: A000000677010111 (PromptPay)
+        const merchantInfo = '0016A000000677010111' + promptPayValue;
+        qrData += formatEMVData('38', merchantInfo);
+        
+        // Transaction Currency (53) - THB = 764
+        qrData += formatEMVData('53', '0764');
+        
+        // Transaction Amount (54)
+        qrData += formatEMVData('54', amountStr);
+        
+        // Country Code (58) - TH = Thailand
+        qrData += formatEMVData('58', 'TH');
+        
+        // Calculate CRC (63) - CRC is calculated on data WITHOUT the CRC field
+        // Then append CRC field with the calculated value
+        const crc = calculateCRC16(qrData + '6304');
+        qrData += formatEMVData('63', crc);
+        
+        // Generate QR code with properly formatted Thai QR string
+        const qrString = qrData;
+        
+        DEBUG.log('Generated Thai QR Code string:', qrString);
+        DEBUG.log('Amount:', amountStr, 'PromptPay ID:', promptPayId);
         
         // Clear previous QR code
         qrContainer.innerHTML = "";
