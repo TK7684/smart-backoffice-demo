@@ -2327,12 +2327,51 @@
             return qrData;
           }
           
+          // Validate QR code format (for debugging)
+          function validateQRString(qrString) {
+            const issues = [];
+            
+            // Check if starts with Payload Format Indicator
+            if (!qrString.startsWith('000201')) {
+              issues.push('Missing or incorrect Payload Format Indicator');
+            }
+            
+            // Check if contains required fields
+            if (!qrString.includes('5304')) {
+              issues.push('Missing Currency field');
+            }
+            if (!qrString.includes('5802TH')) {
+              issues.push('Missing Country Code field');
+            }
+            if (!qrString.match(/6304[0-9A-F]{4}$/)) {
+              issues.push('Missing or invalid CRC field');
+            }
+            
+            // Extract and verify CRC
+            const crcMatch = qrString.match(/6304([0-9A-F]{4})$/);
+            if (crcMatch) {
+              const dataForCRC = qrString.substring(0, qrString.length - 6) + '6304';
+              const calculatedCRC = calculateCRC16(dataForCRC);
+              const providedCRC = crcMatch[1];
+              
+              if (calculatedCRC !== providedCRC) {
+                issues.push(`CRC mismatch: calculated=${calculatedCRC}, provided=${providedCRC}`);
+              }
+            }
+            
+            return {
+              valid: issues.length === 0,
+              issues: issues
+            };
+          }
+          
           // Public API
           return {
             generate: generate,
             calculateCRC16: calculateCRC16,
             formatEMVData: formatEMVData,
-            formatPromptPayID: formatPromptPayID
+            formatPromptPayID: formatPromptPayID,
+            validateQRString: validateQRString
           };
         })();
         
@@ -2346,6 +2385,14 @@
           DEBUG.log('Generated Thai QR Code using THAI_QRCODE library');
           DEBUG.log('QR String:', qrString);
           DEBUG.log('Amount:', Math.round(amount), 'PromptPay ID:', promptPayId);
+          
+          // Validate the generated QR string
+          const validation = THAI_QRCODE.validateQRString(qrString);
+          if (!validation.valid) {
+            DEBUG.warn('QR Code validation issues:', validation.issues);
+          } else {
+            DEBUG.log('✓ QR Code format validated successfully');
+          }
         } catch (error) {
           DEBUG.error('Error generating Thai QR Code:', error);
           qrContainer.innerHTML = 
