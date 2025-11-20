@@ -1197,25 +1197,28 @@
         let attempts = 0;
         const maxAttempts = 3;
         const cdnUrls = [
+          'https://cdn.jsdelivr.net/gh/davidshimjs/qrcodejs@gh-pages/qrcode.min.js',
+          'https://unpkg.com/qrcodejs@1.0.0/qrcode.min.js',
+          'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js',
           'https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js',
-          'https://unpkg.com/qrcode@1.5.3/build/qrcode.min.js',
-          'https://cdn.jsdelivr.net/npm/qrcode@1.5.3/qrcode.min.js',
-          'https://unpkg.com/qrcode@1.5.3/qrcode.min.js',
-          'https://cdnjs.cloudflare.com/ajax/libs/qrcode/1.5.3/qrcode.min.js',
-          'https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js'
+          'https://unpkg.com/qrcode@1.5.3/build/qrcode.min.js'
         ];
         
         function checkQRCodeLibrary() {
-          // Check multiple possible global names and methods
-          const qrCode = window.QRCode || window.qrcode || (typeof QRCode !== 'undefined' ? QRCode : null);
-          
+          // Check for qrcodejs (davidshimjs) - uses QRCode constructor
+          if (typeof QRCode !== 'undefined' && typeof QRCode === 'function') {
+            qrCodeLoaded = true;
+            DEBUG.log('✓ QRCode library (qrcodejs) loaded successfully');
+            return true;
+          }
+          // Check for qrcode npm package - uses QRCode.toCanvas
+          const qrCode = window.QRCode || window.qrcode;
           if (qrCode && typeof qrCode.toCanvas === 'function') {
-            // Ensure it's available globally
             if (!window.QRCode) {
               window.QRCode = qrCode;
             }
             qrCodeLoaded = true;
-            DEBUG.log('✓ QRCode library loaded successfully');
+            DEBUG.log('✓ QRCode library (qrcode npm) loaded successfully');
             return true;
           }
           return false;
@@ -2150,6 +2153,11 @@
         
         // Check if QRCode library is loaded - wait a bit if not ready
         function isQRCodeReady() {
+          // Check for qrcodejs (constructor function)
+          if (typeof QRCode === 'function') {
+            return true;
+          }
+          // Check for qrcode npm (toCanvas method)
           const qrCode = window.QRCode || window.qrcode || (typeof QRCode !== 'undefined' ? QRCode : null);
           return qrCode && typeof qrCode.toCanvas === 'function';
         }
@@ -2198,45 +2206,68 @@
         // Clear previous QR code
         qrContainer.innerHTML = "";
         
-        // Create a canvas element for QR code
-        const canvas = document.createElement('canvas');
-        qrContainer.appendChild(canvas);
-        
-        // Generate QR code using qrcode.js library
+        // Generate QR code using available library
         try {
-          // Use QRCode from global scope (try multiple possible names)
-          const QRCodeLib = window.QRCode || window.qrcode || (typeof QRCode !== 'undefined' ? QRCode : null);
-          
-          if (!QRCodeLib || typeof QRCodeLib.toCanvas !== 'function') {
+          // Check for qrcodejs (davidshimjs) - uses constructor
+          if (typeof QRCode === 'function') {
+            DEBUG.log('Using qrcodejs library');
+            // Create a div for qrcodejs
+            const qrDiv = document.createElement('div');
+            qrDiv.id = 'qrcode-' + Date.now();
+            qrContainer.appendChild(qrDiv);
+            
+            // Generate QR code with qrcodejs
+            new QRCode(qrDiv, {
+              text: qrString,
+              width: 250,
+              height: 250,
+              colorDark: '#000000',
+              colorLight: '#FFFFFF',
+              correctLevel: QRCode.CorrectLevel.M
+            });
+            
+            DEBUG.log('QR Code generated successfully with qrcodejs');
+            // Add payment details below QR
+            const paymentDetails = document.createElement('div');
+            paymentDetails.style.cssText = 'margin-top: 12px; font-size: 12px; color: #8b7355; text-align: center;';
+            paymentDetails.innerHTML = `จำนวนเงิน: <strong>${amount.toLocaleString()} ฿</strong><br>รับเงิน: ${merchantName}`;
+            qrContainer.appendChild(paymentDetails);
+          }
+          // Check for qrcode npm package - uses toCanvas
+          else if (typeof QRCode !== 'undefined' && typeof QRCode.toCanvas === 'function') {
+            DEBUG.log('Using qrcode npm library');
+            const canvas = document.createElement('canvas');
+            qrContainer.appendChild(canvas);
+            
+            QRCode.toCanvas(canvas, qrString, {
+              width: 250,
+              margin: 2,
+              color: {
+                dark: '#000000',
+                light: '#FFFFFF'
+              },
+              errorCorrectionLevel: 'M'
+            }, function (error) {
+              if (error) {
+                DEBUG.error('QR Code generation error:', error);
+                qrContainer.innerHTML = 
+                  '<div style="padding: 20px; color: #8b7355; text-align: center; border: 2px dashed #8b7355; border-radius: 8px;">' +
+                  '⚠️ ไม่สามารถสร้าง QR Code ได้<br>' +
+                  'กรุณาติดต่อ: ' + PAYMENT_CONFIG.contactPhone + '<br>' +
+                  '<small style="color: #8b7355;">หรือชำระเงินโดยตรง</small>' +
+                  '</div>';
+              } else {
+                DEBUG.log('QR Code generated successfully');
+                // Add payment details below QR
+                const paymentDetails = document.createElement('div');
+                paymentDetails.style.cssText = 'margin-top: 12px; font-size: 12px; color: #8b7355; text-align: center;';
+                paymentDetails.innerHTML = `จำนวนเงิน: <strong>${amount.toLocaleString()} ฿</strong><br>รับเงิน: ${merchantName}`;
+                qrContainer.appendChild(paymentDetails);
+              }
+            });
+          } else {
             throw new Error('QRCode library not available');
           }
-          
-          QRCodeLib.toCanvas(canvas, qrString, {
-            width: 250,
-            margin: 2,
-            color: {
-              dark: '#000000',
-              light: '#FFFFFF'
-            },
-            errorCorrectionLevel: 'M'
-          }, function (error) {
-            if (error) {
-              DEBUG.error('QR Code generation error:', error);
-              qrContainer.innerHTML = 
-                '<div style="padding: 20px; color: #8b7355; text-align: center; border: 2px dashed #8b7355; border-radius: 8px;">' +
-                '⚠️ ไม่สามารถสร้าง QR Code ได้<br>' +
-                'กรุณาติดต่อ: ' + PAYMENT_CONFIG.contactPhone + '<br>' +
-                '<small style="color: #8b7355;">หรือชำระเงินโดยตรง</small>' +
-                '</div>';
-            } else {
-              DEBUG.log('QR Code generated successfully');
-              // Add payment details below QR
-              const paymentDetails = document.createElement('div');
-              paymentDetails.style.cssText = 'margin-top: 12px; font-size: 12px; color: #8b7355; text-align: center;';
-              paymentDetails.innerHTML = `จำนวนเงิน: <strong>${amount.toLocaleString()} ฿</strong><br>รับเงิน: ${merchantName}`;
-              qrContainer.appendChild(paymentDetails);
-            }
-          });
         } catch (err) {
           DEBUG.error('Error generating QR code:', err);
           qrContainer.innerHTML = 
