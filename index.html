@@ -2197,13 +2197,16 @@
           'use strict';
           
           // CRC-16/CCITT-FALSE calculation
-          // Based on EMV QR Code standard
+          // Based on EMV QR Code standard and pypromptpay implementation
           function calculateCRC16(data) {
             let crc = 0xFFFF;
             const polynomial = 0x1021;
             
+            // Convert string to bytes for CRC calculation
             for (let i = 0; i < data.length; i++) {
-              crc ^= (data.charCodeAt(i) << 8);
+              const byte = data.charCodeAt(i);
+              crc ^= (byte << 8);
+              
               for (let j = 0; j < 8; j++) {
                 if (crc & 0x8000) {
                   crc = ((crc << 1) ^ polynomial) & 0xFFFF;
@@ -2212,7 +2215,9 @@
                 }
               }
             }
-            return crc.toString(16).toUpperCase().padStart(4, '0');
+            
+            // Return as 4-digit uppercase hex string
+            return (crc & 0xFFFF).toString(16).toUpperCase().padStart(4, '0');
           }
           
           // Format EMV QR code data object (ID + Length + Value)
@@ -2222,23 +2227,30 @@
           }
           
           // Format PromptPay ID according to Thai QR standard
+          // Based on EMV QR Code and PromptPay specification
+          // For phone numbers: Tag 01 with value "01130066" + phone number
+          // For national ID: Tag 01 with value "01130066" + national ID
           function formatPromptPayID(promptPayId) {
             // Remove any non-digit characters
             const cleanId = promptPayId.replace(/\D/g, '');
             
+            // PromptPay uses "01130066" as the prefix for both phone and national ID
+            // This is the PromptPay AID (Application Identifier)
+            const promptPayPrefix = '01130066';
+            
             if (cleanId.length === 10) {
-              // Phone number (10 digits)
-              return '01130066' + cleanId;
+              // Phone number (10 digits) - format: prefix + phone
+              return promptPayPrefix + cleanId;
             } else if (cleanId.length === 13) {
-              // National ID (13 digits)
-              return '01130066' + cleanId;
+              // National ID (13 digits) - format: prefix + national ID
+              return promptPayPrefix + cleanId;
             } else if (cleanId.length < 10) {
-              // Pad to 10 digits (phone number)
+              // Pad to 10 digits (treat as phone number)
               const paddedId = cleanId.padStart(10, '0');
-              return '01130066' + paddedId;
+              return promptPayPrefix + paddedId;
             } else {
-              // Use first 13 digits if longer
-              return '01130066' + cleanId.substring(0, 13);
+              // If longer than 13, use first 13 digits (treat as national ID)
+              return promptPayPrefix + cleanId.substring(0, 13);
             }
           }
           
@@ -2294,10 +2306,23 @@
             qrData += formatEMVData('58', 'TH');
             
             // Calculate CRC (63)
-            // CRC is calculated on the data including CRC field ID and length (6304), but not the CRC value
+            // According to EMV QR Code standard:
+            // 1. Build data string up to (but not including) CRC field
+            // 2. Append CRC field ID and length: "6304"
+            // 3. Calculate CRC on this string
+            // 4. Append CRC field with calculated value
             const dataForCRC = qrData + '6304';
-            const crc = calculateCRC16(dataForCRC);
-            qrData += formatEMVData('63', crc);
+            const crcValue = calculateCRC16(dataForCRC);
+            qrData += formatEMVData('63', crcValue);
+            
+            // Debug: Log CRC calculation details
+            if (typeof DEBUG !== 'undefined' && DEBUG.log) {
+              DEBUG.log('CRC Calculation:', {
+                dataForCRC: dataForCRC,
+                calculatedCRC: crcValue,
+                finalQRString: qrData
+              });
+            }
             
             return qrData;
           }
