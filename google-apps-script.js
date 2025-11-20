@@ -20,6 +20,143 @@ const SPREADSHEET_ID = '1AASP5TVxS_uTH0Ei13yJGUOZYYkgSxkOHYfUjLlOZ2M';
 const NOTIFICATION_EMAIL = 'tripetkk@gmail.com';
 const SHEET_NAME = 'Leads'; // Sheet name where data will be saved
 
+// KBank API Configuration
+// Update these with your actual KBank API credentials
+const KBANK_CONFIG = {
+  // OAuth Credentials (from KBank API portal)
+  CONSUMER_ID: '6HGlv0Gg0qMoF3wtJy1AFmj29BgevRlo',
+  CONSUMER_SECRET: 'cWkvogpBGSXeSmGN',
+  
+  // Partner Credentials (from exercises - use test values or your own)
+  PARTNER_ID: 'PTR1051673',
+  PARTNER_SECRET: 'd4bded59200547bc85903574a293831b',
+  MERCHANT_ID: 'KB102057149704',
+  
+  // API Base URLs
+  OAUTH_URL: 'https://openapi-sandbox.kasikornbank.com/v2/oauth/token',
+  QR_REQUEST_URL: 'https://openapi-sandbox.kasikornbank.com/v1/qrpayment/request'
+};
+
+// Cache for access token (expires in ~29 minutes)
+let cachedAccessToken = null;
+let tokenExpiryTime = null;
+
+/**
+ * Get KBank OAuth Access Token
+ */
+function getKBankAccessToken() {
+  try {
+    // Check if we have a valid cached token
+    if (cachedAccessToken && tokenExpiryTime && new Date() < tokenExpiryTime) {
+      Logger.log('Using cached access token');
+      return cachedAccessToken;
+    }
+    
+    Logger.log('Requesting new KBank access token...');
+    
+    // Create Basic Auth header
+    const credentials = Utilities.base64Encode(
+      KBANK_CONFIG.CONSUMER_ID + ':' + KBANK_CONFIG.CONSUMER_SECRET
+    );
+    
+    const options = {
+      method: 'post',
+      headers: {
+        'Authorization': 'Basic ' + credentials,
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      payload: 'grant_type=client_credentials'
+    };
+    
+    const response = UrlFetchApp.fetch(KBANK_CONFIG.OAUTH_URL, options);
+    const responseData = JSON.parse(response.getContentText());
+    
+    if (responseData.access_token) {
+      cachedAccessToken = responseData.access_token;
+      // Set expiry time (token expires in ~29 minutes, use 25 minutes for safety)
+      tokenExpiryTime = new Date(Date.now() + (25 * 60 * 1000));
+      Logger.log('Successfully obtained KBank access token');
+      return cachedAccessToken;
+    } else {
+      throw new Error('Failed to get access token: ' + JSON.stringify(responseData));
+    }
+  } catch (error) {
+    Logger.log('Error getting KBank access token: ' + error.toString());
+    throw error;
+  }
+}
+
+/**
+ * Generate Thai QR Code using KBank API
+ */
+function generateKBankQRCode(amount, reference1, reference2, reference3, reference4) {
+  try {
+    Logger.log('Generating KBank QR Code for amount: ' + amount);
+    
+    // Get access token
+    const accessToken = getKBankAccessToken();
+    
+    // Generate unique transaction ID
+    const partnerTxnUid = 'TXN' + Date.now() + Math.floor(Math.random() * 1000);
+    const requestTime = new Date().toISOString();
+    
+    // Prepare request body
+    const requestBody = {
+      partnerTxnUid: partnerTxnUid,
+      partnerId: KBANK_CONFIG.PARTNER_ID,
+      partnerSecret: KBANK_CONFIG.PARTNER_SECRET,
+      requestDt: requestTime,
+      merchantId: KBANK_CONFIG.MERCHANT_ID,
+      qrType: 3, // Thai QR Code
+      txnAmount: Math.round(amount), // Integer format for THB
+      txnCurrencyCode: 'THB',
+      reference1: reference1 || 'PAYMENT',
+      reference2: reference2 || '',
+      reference3: reference3 || '',
+      reference4: reference4 || ''
+    };
+    
+    const options = {
+      method: 'post',
+      headers: {
+        'Authorization': 'Bearer ' + accessToken,
+        'Content-Type': 'application/json',
+        'x-test-mode': 'true',
+        'env-id': 'QR002'
+      },
+      payload: JSON.stringify(requestBody)
+    };
+    
+    const response = UrlFetchApp.fetch(KBANK_CONFIG.QR_REQUEST_URL, options);
+    const responseData = JSON.parse(response.getContentText());
+    
+    if (response.getResponseCode() === 200 || response.getResponseCode() === 201) {
+      Logger.log('Successfully generated KBank QR Code');
+      return {
+        success: true,
+        qrData: responseData.qrData || responseData.data?.qrData,
+        partnerTxnUid: partnerTxnUid,
+        data: responseData
+      };
+    } else {
+      Logger.log('Failed to generate QR code. Status: ' + response.getResponseCode());
+      Logger.log('Response: ' + JSON.stringify(responseData));
+      return {
+        success: false,
+        error: responseData.errorDesc || responseData.message || 'Unknown error',
+        status: response.getResponseCode(),
+        data: responseData
+      };
+    }
+  } catch (error) {
+    Logger.log('Error generating KBank QR Code: ' + error.toString());
+    return {
+      success: false,
+      error: error.toString()
+    };
+  }
+}
+
 /**
  * Handle POST request from the form
  */
@@ -55,6 +192,21 @@ function doPost(e) {
         timestamp: e.parameter.timestamp || new Date().toISOString()
       };
       Logger.log('Constructed data object: ' + JSON.stringify(data));
+    }
+    
+    // Check if this is a QR code generation request
+    if (data.action === 'generateQRCode' || data.type === 'qrCode') {
+      Logger.log('QR Code generation request detected');
+      const qrResult = generateKBankQRCode(
+        data.amount || 0,
+        data.reference1 || 'PAYMENT',
+        data.reference2 || '',
+        data.reference3 || '',
+        data.reference4 || ''
+      );
+      
+      return ContentService.createTextOutput(JSON.stringify(qrResult))
+        .setMimeType(ContentService.MimeType.JSON);
     }
     
     // Open the spreadsheet
