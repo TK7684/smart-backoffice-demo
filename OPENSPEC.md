@@ -1,7 +1,7 @@
 # Open Specification - AI Smart Backoffice Demo
 
-**Version**: 1.2.0  
-**Last Updated**: 2024-01-15  
+**Version**: 1.3.0  
+**Last Updated**: 2024-12-19  
 **Purpose**: This specification ensures all code changes and development efforts remain aligned with the program's main objectives.
 
 **Current Implementation Status**: 
@@ -23,6 +23,7 @@
 8. [Implementation Status](#implementation-status)
 9. [Alignment Checklist](#alignment-checklist)
 10. [Change Management](#change-management)
+11. [Codebase Monitoring & Optimization](#codebase-monitoring--optimization)
 
 ---
 
@@ -872,6 +873,13 @@ Use this checklist before deploying any changes to ensure code remains aligned w
 
 ### Version History
 
+**Version 1.3.0** (2024-12-19)
+- Added Codebase Monitoring & Optimization system
+- Implemented automated compliance checking
+- Added debug utility for production-ready logging
+- Enhanced code quality tracking
+- Updated monitoring and optimization documentation
+
 **Version 1.2.0** (2024-01-15)
 - Added Implementation Status section tracking current vs required state
 - Updated FR7 and FR8 with current implementation status
@@ -983,14 +991,139 @@ Use this checklist before deploying any changes to ensure code remains aligned w
 
 ---
 
-**Last Updated**: 2024-01-15  
-**Version**: 1.2.0  
+**Last Updated**: 2024-12-19  
+**Version**: 1.3.0  
 **Status**: Active
 
 **Implementation Status Summary**:
 - ✅ Demo System: Fully operational
 - ⚠️ Production Scaling: Specified, implementation required
 - 📋 See Implementation Status section for detailed tracking
+
+---
+
+## Codebase Monitoring & Optimization
+
+### Overview
+
+A comprehensive monitoring and optimization system has been implemented to ensure code quality, compliance with OPENSPEC, and continuous improvement of the codebase.
+
+### Monitoring System
+
+**File**: `codebase-monitor.js`
+
+The monitoring system tracks:
+- ✅ File changes and updates
+- ✅ OPENSPEC compliance violations
+- ✅ Code quality metrics
+- ✅ Performance thresholds
+- ✅ Security issues
+
+**Features**:
+- Automatic change detection using file hashing
+- Real-time compliance checking
+- Code quality analysis
+- Performance monitoring
+- Violation reporting
+
+**Usage**:
+```bash
+# Run one-time check
+node codebase-monitor.js
+
+# Watch mode (continuous monitoring)
+node codebase-monitor.js --watch
+
+# Generate detailed report
+node codebase-monitor.js --report
+```
+
+**Monitored Files**:
+- `index.html` - Frontend application
+- `google-apps-script.js` - Backend script
+- `CONTAINER_BOUND_SCRIPT.js` - Container-bound script
+- `OPENSPEC.md` - Specification document
+
+**Compliance Checks**:
+- Prohibited patterns (frameworks, bundlers, external databases)
+- Required patterns (dynamic API endpoints, Google Sheets usage, earth tone colors)
+- File structure rules (max sizes, required sections/functions)
+- Performance thresholds (file size, function length)
+
+### Optimization System
+
+**File**: `codebase-optimizer.js`
+
+The optimization system provides:
+- ✅ Code quality analysis
+- ✅ Performance optimization suggestions
+- ✅ Code refactoring recommendations
+- ✅ Utility functions for common patterns
+
+**Optimizations Implemented**:
+
+1. **Debug Utility** (v1.3.0)
+   - Wrapped all `console.log` statements in `DEBUG` utility
+   - Can be disabled in production by setting `DEBUG.enabled = false`
+   - Provides consistent logging interface
+   - Location: `index.html` (after line 1827)
+
+2. **Code Quality Improvements**:
+   - Standardized error handling
+   - Reduced console.log statements in production code
+   - Improved code maintainability
+
+**Usage**:
+```bash
+# Generate optimization report
+node codebase-optimizer.js
+```
+
+**Output Files**:
+- `codebase-monitor-report.json` - Detailed monitoring report
+- `optimization-report.json` - Optimization recommendations
+- `optimization-snippets.js` - Reusable code snippets
+
+### Monitoring Rules
+
+#### Prohibited Patterns (High Severity)
+- ❌ JavaScript frameworks (React, Vue, Angular)
+- ❌ Build tools (Webpack, Vite, Rollup)
+- ❌ External databases (MySQL, MongoDB, Firebase)
+- ❌ Hardcoded API URLs (must use dynamic `?api=` parameter)
+
+#### Required Patterns (High Severity)
+- ✅ Dynamic API endpoint reading from URL parameter
+- ✅ Google Sheets integration (`SpreadsheetApp`)
+- ✅ Earth tone color scheme (`#8b7355`, `#f5f1e8`)
+
+#### Performance Thresholds
+- File size: Max 100KB per file
+- Function length: Max 100 lines
+- Cyclomatic complexity: Max 10
+
+### Integration with Development Workflow
+
+**Before Committing**:
+1. Run `node codebase-monitor.js` to check for violations
+2. Review violations and fix high/medium severity issues
+3. Run `node codebase-optimizer.js` for optimization suggestions
+4. Update documentation if needed
+
+**Continuous Monitoring**:
+- Use `--watch` mode during development
+- Monitor `codebase-monitor-report.json` for changes
+- Review optimization suggestions regularly
+
+### Version History
+
+**Version 1.3.0** (2024-12-19)
+- Added Codebase Monitoring & Optimization section
+- Implemented `codebase-monitor.js` for compliance tracking
+- Implemented `codebase-optimizer.js` for optimization suggestions
+- Wrapped console.log statements in DEBUG utility
+- Added monitoring rules and thresholds
+- Integrated monitoring into development workflow
 
 ---
 
