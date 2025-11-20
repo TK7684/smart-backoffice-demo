@@ -2189,90 +2189,148 @@
         const promptPayId = PAYMENT_CONFIG.promptPayId;
         const merchantName = PAYMENT_CONFIG.merchantName;
         
-        // Thai QR Payment String (Thai QR Standard format - EMV QR Code)
-        // Reference: https://github.com/suphakin-th/THAI_QRCODE
-        // Format: Payload Format Indicator + Point of Initiation + Merchant Account Info + Currency + Amount + Country + CRC
+        // THAI_QRCODE Library - JavaScript Implementation
+        // Based on https://github.com/suphakin-th/THAI_QRCODE
+        // This is a JavaScript port of the Python pypromptpay library
         
-        // Helper function to calculate CRC-16/CCITT-FALSE checksum
-        // Based on EMV QR Code standard and THAI_QRCODE repository
-        function calculateCRC16(data) {
-          let crc = 0xFFFF;
-          const polynomial = 0x1021;
+        const THAI_QRCODE = (function() {
+          'use strict';
           
-          for (let i = 0; i < data.length; i++) {
-            crc ^= (data.charCodeAt(i) << 8);
-            for (let j = 0; j < 8; j++) {
-              if (crc & 0x8000) {
-                crc = ((crc << 1) ^ polynomial) & 0xFFFF;
-              } else {
-                crc = (crc << 1) & 0xFFFF;
+          // CRC-16/CCITT-FALSE calculation
+          // Based on EMV QR Code standard
+          function calculateCRC16(data) {
+            let crc = 0xFFFF;
+            const polynomial = 0x1021;
+            
+            for (let i = 0; i < data.length; i++) {
+              crc ^= (data.charCodeAt(i) << 8);
+              for (let j = 0; j < 8; j++) {
+                if (crc & 0x8000) {
+                  crc = ((crc << 1) ^ polynomial) & 0xFFFF;
+                } else {
+                  crc = (crc << 1) & 0xFFFF;
+                }
               }
             }
+            return crc.toString(16).toUpperCase().padStart(4, '0');
           }
-          return crc.toString(16).toUpperCase().padStart(4, '0');
+          
+          // Format EMV QR code data object (ID + Length + Value)
+          function formatEMVData(id, value) {
+            const length = value.length.toString().padStart(2, '0');
+            return id + length + value;
+          }
+          
+          // Format PromptPay ID according to Thai QR standard
+          function formatPromptPayID(promptPayId) {
+            // Remove any non-digit characters
+            const cleanId = promptPayId.replace(/\D/g, '');
+            
+            if (cleanId.length === 10) {
+              // Phone number (10 digits)
+              return '01130066' + cleanId;
+            } else if (cleanId.length === 13) {
+              // National ID (13 digits)
+              return '01130066' + cleanId;
+            } else if (cleanId.length < 10) {
+              // Pad to 10 digits (phone number)
+              const paddedId = cleanId.padStart(10, '0');
+              return '01130066' + paddedId;
+            } else {
+              // Use first 13 digits if longer
+              return '01130066' + cleanId.substring(0, 13);
+            }
+          }
+          
+          // Generate Thai QR Code string
+          // Parameters:
+          //   promptPayId: string - PromptPay ID (phone number or national ID)
+          //   amount: number - Transaction amount (will be rounded to integer for THB)
+          //   options: object - Optional configuration
+          //     - static: boolean - Use static QR (default: false, uses dynamic)
+          function generate(promptPayId, amount, options = {}) {
+            if (!promptPayId || promptPayId.length < 10) {
+              throw new Error('PromptPay ID must be at least 10 digits');
+            }
+            
+            if (!amount || amount <= 0) {
+              throw new Error('Amount must be greater than 0');
+            }
+            
+            // For THB currency, use integer amount (no decimals)
+            const amountStr = Math.round(amount).toString();
+            
+            // Format PromptPay ID
+            const promptPayValue = formatPromptPayID(promptPayId);
+            
+            // Build EMV QR Code data
+            let qrData = '';
+            
+            // Payload Format Indicator (00) - Always '01' for EMV QR Code
+            qrData += formatEMVData('00', '01');
+            
+            // Point of Initiation Method (01)
+            // '11' = static QR code (no amount)
+            // '12' = dynamic QR code (with amount)
+            const poiMethod = (options.static || amount === 0) ? '11' : '12';
+            qrData += formatEMVData('01', poiMethod);
+            
+            // Merchant Account Information (38)
+            // Contains: GUID (00) + PromptPay ID (01)
+            // AID: A000000677010111 (PromptPay)
+            const guid = 'A000000677010111';
+            const merchantInfo = formatEMVData('00', guid) + formatEMVData('01', promptPayValue);
+            qrData += formatEMVData('38', merchantInfo);
+            
+            // Transaction Currency (53) - THB = 764
+            qrData += formatEMVData('53', '0764');
+            
+            // Transaction Amount (54) - Only include if dynamic QR
+            if (poiMethod === '12') {
+              qrData += formatEMVData('54', amountStr);
+            }
+            
+            // Country Code (58) - TH = Thailand
+            qrData += formatEMVData('58', 'TH');
+            
+            // Calculate CRC (63)
+            // CRC is calculated on the data including CRC field ID and length (6304), but not the CRC value
+            const dataForCRC = qrData + '6304';
+            const crc = calculateCRC16(dataForCRC);
+            qrData += formatEMVData('63', crc);
+            
+            return qrData;
+          }
+          
+          // Public API
+          return {
+            generate: generate,
+            calculateCRC16: calculateCRC16,
+            formatEMVData: formatEMVData,
+            formatPromptPayID: formatPromptPayID
+          };
+        })();
+        
+        // Generate Thai QR Code using THAI_QRCODE library
+        let qrString;
+        try {
+          qrString = THAI_QRCODE.generate(promptPayId, amount, {
+            static: false // Dynamic QR with amount
+          });
+          
+          DEBUG.log('Generated Thai QR Code using THAI_QRCODE library');
+          DEBUG.log('QR String:', qrString);
+          DEBUG.log('Amount:', Math.round(amount), 'PromptPay ID:', promptPayId);
+        } catch (error) {
+          DEBUG.error('Error generating Thai QR Code:', error);
+          qrContainer.innerHTML = 
+            '<div style="padding: 20px; color: #f57c00; text-align: center; border: 2px dashed #f57c00; border-radius: 8px;">' +
+            '⚠️ เกิดข้อผิดพลาดในการสร้าง QR Code<br>' +
+            error.message + '<br>' +
+            'กรุณาติดต่อ: ' + PAYMENT_CONFIG.contactPhone +
+            '</div>';
+          return;
         }
-        
-        // Helper function to format EMV QR code data object
-        function formatEMVData(id, value) {
-          const length = value.length.toString().padStart(2, '0');
-          return id + length + value;
-        }
-        
-        // Build Thai QR Code string according to EMV QR Code standard
-        // For THB currency, use integer amount (no decimals) as per Thai QR standard
-        const amountStr = Math.round(amount).toString();
-        
-        // Determine PromptPay ID type and format
-        let promptPayValue;
-        if (promptPayId.length === 10) {
-          // Phone number (10 digits)
-          promptPayValue = '01130066' + promptPayId;
-        } else if (promptPayId.length === 13) {
-          // National ID (13 digits)
-          promptPayValue = '01130066' + promptPayId;
-        } else {
-          // Default: treat as phone number and pad
-          const paddedId = promptPayId.padStart(10, '0');
-          promptPayValue = '01130066' + paddedId;
-        }
-        
-        // Build EMV QR Code data
-        let qrData = '';
-        
-        // Payload Format Indicator (00)
-        qrData += formatEMVData('00', '01');
-        
-        // Point of Initiation Method (01) - 11 = static, 12 = dynamic
-        qrData += formatEMVData('01', '12');
-        
-        // Merchant Account Information (38)
-        // Contains: GUID (00) + PromptPay ID (01)
-        // AID: A000000677010111 (PromptPay)
-        const guid = 'A000000677010111';
-        const merchantInfo = formatEMVData('00', guid) + formatEMVData('01', promptPayValue);
-        qrData += formatEMVData('38', merchantInfo);
-        
-        // Transaction Currency (53) - THB = 764
-        qrData += formatEMVData('53', '0764');
-        
-        // Transaction Amount (54)
-        qrData += formatEMVData('54', amountStr);
-        
-        // Country Code (58) - TH = Thailand
-        qrData += formatEMVData('58', 'TH');
-        
-        // Calculate CRC (63) 
-        // CRC is calculated on the data including CRC field ID and length (6304), but not the CRC value
-        // Then append the calculated CRC value
-        const dataForCRC = qrData + '6304';
-        const crc = calculateCRC16(dataForCRC);
-        qrData += formatEMVData('63', crc);
-        
-        // Generate QR code with properly formatted Thai QR string
-        const qrString = qrData;
-        
-        DEBUG.log('Generated Thai QR Code string:', qrString);
-        DEBUG.log('Amount:', amountStr, 'PromptPay ID:', promptPayId);
         
         // Clear previous QR code
         qrContainer.innerHTML = "";
