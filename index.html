@@ -1802,7 +1802,7 @@
       // Falls back to demo URL if no parameter provided
       const urlParams = new URLSearchParams(window.location.search);
       const apiParam = urlParams.get('api');
-      const DEMO_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyY7zhH35IxE38Jr0Ksm0pcsBqEcdVOCyMzzokVFL4bTaAA2emwWxDbU7aJB1O0IkWv1w/exec';
+      const DEMO_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxUr_ZyP-AgSMBCGB3j-UDxWXqw-GmAinb5HVC-cEEIHlVAYP40XuEuun9iEODjAevg6Q/exec';
       const GOOGLE_SCRIPT_URL = apiParam || DEMO_SCRIPT_URL;
       
       // Debug utility - can be disabled in production
@@ -1837,7 +1837,7 @@
       const PAYMENT_CONFIG = {
         // Your Stripe Publishable Key (from Stripe Dashboard)
         // Get it from: https://dashboard.stripe.com/apikeys
-        stripePublishableKey: "pk_test_51...", // ⚠️ REPLACE WITH YOUR STRIPE PUBLISHABLE KEY
+        stripePublishableKey: "pk_live_51QSYw8G3QrbqVa97rn8W2uNSThgwhoEBbFnUJBcAywTKilkY7qnB9NMao1x0jdb6t7P17bDQC0YVNIVEFrMXhrfb004UJeAwv3", // ⚠️ REPLACE WITH YOUR STRIPE PUBLISHABLE KEY
         
         // Your backend API endpoint to create Stripe Checkout sessions
         // This should be your server endpoint that creates a Stripe Checkout Session
