@@ -1837,7 +1837,9 @@
       const PAYMENT_CONFIG = {
         // Your Stripe Publishable Key (from Stripe Dashboard)
         // Get it from: https://dashboard.stripe.com/apikeys
-        stripePublishableKey: "pk_live_51QSYw8G3QrbqVa97rn8W2uNSThgwhoEBbFnUJBcAywTKilkY7qnB9NMao1x0jdb6t7P17bDQC0YVNIVEFrMXhrfb004UJeAwv3", // ⚠️ REPLACE WITH YOUR STRIPE PUBLISHABLE KEY
+        // Use TEST keys for development, LIVE keys for production
+        // Get from: https://dashboard.stripe.com/apikeys
+        stripePublishableKey: "pk_test_51QSYw8G3QrbqVa97rn8W2uNSThgwhoEBbFnUJBcAywTKilkY7qnB9NMao1x0jdb6t7P17bDQC0YVNIVEFrMXhrfb004UJeAwv3", // ⚠️ Use pk_test_ for testing, pk_live_ for production
         
         // Your Vercel backend API endpoint to create Stripe Checkout sessions
         // Get this URL from your Vercel deployment (e.g., https://your-project.vercel.app/api)
