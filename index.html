@@ -1839,9 +1839,10 @@
         // Get it from: https://dashboard.stripe.com/apikeys
         stripePublishableKey: "pk_live_51QSYw8G3QrbqVa97rn8W2uNSThgwhoEBbFnUJBcAywTKilkY7qnB9NMao1x0jdb6t7P17bDQC0YVNIVEFrMXhrfb004UJeAwv3", // ⚠️ REPLACE WITH YOUR STRIPE PUBLISHABLE KEY
         
-        // Your backend API endpoint to create Stripe Checkout sessions
-        // This should be your server endpoint that creates a Stripe Checkout Session
-        stripeCheckoutUrl: GOOGLE_SCRIPT_URL, // Using Google Apps Script as backend
+        // Your Vercel backend API endpoint to create Stripe Checkout sessions
+        // Get this URL from your Vercel deployment (e.g., https://your-project.vercel.app/api)
+        // ⚠️ IMPORTANT: Replace with your actual Vercel URL after deployment
+        stripeCheckoutUrl: "https://your-project.vercel.app/api", // ⚠️ REPLACE WITH YOUR VERCEL URL
         
         // Your merchant/business name (will appear in payment details)
         merchantName: "Ped Pro - เป็ดมือโปร",

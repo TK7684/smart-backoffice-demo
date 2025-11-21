@@ -173,12 +173,34 @@ function verifyStripePayment(sessionId, packageData) {
 }
 
 /**
+ * Handle OPTIONS request for CORS preflight
+ */
+function doOptions() {
+  Logger.log('=== doOptions() called (CORS preflight) ===');
+  return ContentService
+    .createTextOutput('')
+    .setMimeType(ContentService.MimeType.JSON)
+    .setHeaders({
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type'
+    });
+}
+
+/**
  * Handle POST request from the form
  */
 function doPost(e) {
   Logger.log('=== doPost() called ===');
   Logger.log('Timestamp: ' + new Date().toISOString());
   Logger.log('Request method: POST');
+  
+  // Set CORS headers for all responses
+  const headers = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type'
+  };
   
   try {
     // Parse the data - handle both JSON and form data
@@ -232,8 +254,14 @@ function doPost(e) {
         package: data.package || ''
       });
       
-      return ContentService.createTextOutput(JSON.stringify(verificationResult))
-        .setMimeType(ContentService.MimeType.JSON);
+      return ContentService
+        .createTextOutput(JSON.stringify(verificationResult))
+        .setMimeType(ContentService.MimeType.JSON)
+        .setHeaders({
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type'
+        });
     }
     
     // Open the spreadsheet
@@ -405,7 +433,12 @@ function doPost(e) {
     Logger.log('=== doPost() completed successfully ===');
     return ContentService
       .createTextOutput(JSON.stringify(response))
-      .setMimeType(ContentService.MimeType.JSON);
+      .setMimeType(ContentService.MimeType.JSON)
+      .setHeaders({
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type'
+      });
       
   } catch (error) {
     Logger.log('=== ERROR in doPost() ===');
@@ -420,7 +453,12 @@ function doPost(e) {
     Logger.log('Returning error response: ' + JSON.stringify(errorResponse));
     return ContentService
       .createTextOutput(JSON.stringify(errorResponse))
-      .setMimeType(ContentService.MimeType.JSON);
+      .setMimeType(ContentService.MimeType.JSON)
+      .setHeaders({
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type'
+      });
   }
 }
 
@@ -459,7 +497,12 @@ function doGet(e) {
   Logger.log('=== doGet() completed ===');
   return ContentService
     .createTextOutput(JSON.stringify(response))
-    .setMimeType(ContentService.MimeType.JSON);
+    .setMimeType(ContentService.MimeType.JSON)
+    .setHeaders({
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type'
+    });
 }
 
 /**
