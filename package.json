@@ -1,0 +1,32 @@
+{
+  "name": "ai-smart-backoffice-demo",
+  "version": "1.3.0",
+  "description": "AI Smart Backoffice Demo with automated codebase monitoring",
+  "scripts": {
+    "monitor": "node codebase-monitor.js",
+    "monitor:watch": "node codebase-monitor.js --watch",
+    "monitor:auto": "node codebase-monitor.js --auto",
+    "monitor:daemon": "node codebase-monitor.js --daemon",
+    "optimize": "node codebase-optimizer.js",
+    "check": "npm run monitor && npm run optimize",
+    "postinstall": "node setup-monitoring.js"
+  },
+  "keywords": [
+    "monitoring",
+    "codebase",
+    "quality",
+    "compliance"
+  ],
+  "author": "tripetkk@gmail.com",
+  "license": "PROPRIETARY",
+  "dependencies": {
+    "chokidar": "^3.5.3",
+    "stripe": "^14.0.0"
+  },
+  "devDependencies": {},
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}
+
+
