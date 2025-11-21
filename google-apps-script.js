@@ -466,14 +466,15 @@ function doPost(e) {
  * Handle OPTIONS request for CORS preflight
  */
 function doOptions() {
-  Logger.log('=== doOptions() called ===');
-  Logger.log('Timestamp: ' + new Date().toISOString());
-  Logger.log('Request method: OPTIONS (CORS preflight)');
-  Logger.log('Returning empty response for CORS preflight');
-  Logger.log('=== doOptions() completed ===');
+  Logger.log('=== doOptions() called (CORS preflight) ===');
   return ContentService
     .createTextOutput('')
-    .setMimeType(ContentService.MimeType.JSON);
+    .setMimeType(ContentService.MimeType.JSON)
+    .setHeaders({
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type'
+    });
 }
 
 /**
