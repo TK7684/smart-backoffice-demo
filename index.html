@@ -1970,13 +1970,12 @@
             const cancelUrl = currentUrl + '?payment_status=cancel';
             
             // Create Stripe Checkout Session via backend
-            const response = await fetch(PAYMENT_CONFIG.stripeCheckoutUrl, {
+            const response = await fetch(PAYMENT_CONFIG.stripeCheckoutUrl + '/create-session', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
               },
               body: JSON.stringify({
-                action: 'createStripeCheckout',
                 package: selectedPackage,
                 packageName: info.displayName,
                 amount: amount,
@@ -2037,13 +2036,12 @@
         const info = packageInfo[selectedPackage];
         
         try {
-          const response = await fetch(PAYMENT_CONFIG.stripeCheckoutUrl, {
+          const response = await fetch(PAYMENT_CONFIG.stripeCheckoutUrl + '/verify-payment', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-              action: 'verifyStripePayment',
               sessionId: sessionId,
               package: selectedPackage
             })
