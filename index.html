@@ -1839,7 +1839,7 @@
         // Get it from: https://dashboard.stripe.com/apikeys
         // Use TEST keys for development, LIVE keys for production
         // Get from: https://dashboard.stripe.com/apikeys
-        stripePublishableKey: "pk_test_51QSYw8G3QrbqVa97rn8W2uNSThgwhoEBbFnUJBcAywTKilkY7qnB9NMao1x0jdb6t7P17bDQC0YVNIVEFrMXhrfb004UJeAwv3", // ⚠️ Use pk_test_ for testing, pk_live_ for production
+        stripePublishableKey: "pk_test_51QSYw8G3QrbqVa97UGPLrpFVYEaChA6LFCGz78REzBeK4ycl6onfwXifIKCuZoYDnTabR4rgPfru4uqaNyxGgd3J00H1NaAWW4", // ⚠️ Use pk_test_ for testing, pk_live_ for production
         
         // Your Vercel backend API endpoint to create Stripe Checkout sessions
         // Get this URL from your Vercel deployment (e.g., https://your-project.vercel.app/api)
@@ -1992,13 +1992,19 @@
             if (result.success && result.sessionId) {
               stripeSessionId = result.sessionId;
               
-              // Redirect to Stripe Checkout
-              const checkoutResult = await stripe.redirectToCheckout({
-                sessionId: result.sessionId
-              });
-              
-              if (checkoutResult.error) {
-                throw new Error(checkoutResult.error.message);
+              // Use direct URL if available, otherwise use redirectToCheckout
+              if (result.url) {
+                // Direct redirect to Stripe Checkout URL (bypasses potential 401 issues)
+                window.location.href = result.url;
+              } else {
+                // Fallback to redirectToCheckout
+                const checkoutResult = await stripe.redirectToCheckout({
+                  sessionId: result.sessionId
+                });
+                
+                if (checkoutResult.error) {
+                  throw new Error(checkoutResult.error.message);
+                }
               }
             } else {
               throw new Error(result.error || 'Failed to create checkout session');
