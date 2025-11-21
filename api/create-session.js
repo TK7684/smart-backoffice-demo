@@ -1,5 +1,3 @@
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-
 module.exports = async (req, res) => {
   // Enable CORS for all origins (you can restrict this to your domain later)
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -21,13 +19,26 @@ module.exports = async (req, res) => {
 
   try {
     // Check if Stripe secret key is set
-    if (!process.env.STRIPE_SECRET_KEY) {
+    const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+    if (!stripeSecretKey) {
       console.error('STRIPE_SECRET_KEY environment variable is not set');
       return res.status(500).json({
         success: false,
         error: 'Stripe secret key not configured. Please set STRIPE_SECRET_KEY in Vercel environment variables.'
       });
     }
+
+    // Validate key format
+    if (!stripeSecretKey.startsWith('sk_test_') && !stripeSecretKey.startsWith('sk_live_')) {
+      console.error('Invalid Stripe secret key format. Must start with sk_test_ or sk_live_');
+      return res.status(500).json({
+        success: false,
+        error: 'Invalid Stripe secret key format. Key must start with sk_test_ or sk_live_'
+      });
+    }
+
+    // Initialize Stripe with the secret key
+    const stripe = require('stripe')(stripeSecretKey);
 
     const { package, packageName, amount, currency, successUrl, cancelUrl } = req.body;
 
