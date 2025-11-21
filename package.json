@@ -8,8 +8,7 @@
     "monitor:auto": "node codebase-monitor.js --auto",
     "monitor:daemon": "node codebase-monitor.js --daemon",
     "optimize": "node codebase-optimizer.js",
-    "check": "npm run monitor && npm run optimize",
-    "postinstall": "node setup-monitoring.js"
+    "check": "npm run monitor && npm run optimize"
   },
   "keywords": [
     "monitoring",
