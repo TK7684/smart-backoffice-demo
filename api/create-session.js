@@ -75,13 +75,9 @@ module.exports = async (req, res) => {
       metadata: {
         package: package || '',
         packageName: packageName || ''
-      },
-      // Enable Link authentication for returning customers
-      payment_method_options: {
-        link: {
-          enabled: true
-        }
       }
+      // Note: Link is enabled by adding 'link' to payment_method_types
+      // Link must also be enabled in Stripe Dashboard: https://dashboard.stripe.com/settings/payment_methods
     });
     
     console.log('Stripe Checkout Session created:', {
