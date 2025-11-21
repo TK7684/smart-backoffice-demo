@@ -51,6 +51,12 @@ module.exports = async (req, res) => {
     }
 
     // Create Stripe Checkout Session
+    console.log('Creating Stripe Checkout Session with:', {
+      amount: amount,
+      currency: currency || 'thb',
+      packageName: packageName
+    });
+    
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       line_items: [{
@@ -71,6 +77,12 @@ module.exports = async (req, res) => {
         packageName: packageName || ''
       }
     });
+    
+    console.log('Stripe Checkout Session created:', {
+      sessionId: session.id,
+      url: session.url,
+      paymentStatus: session.payment_status
+    });
 
     // Return success with session ID
     res.json({
@@ -80,10 +92,27 @@ module.exports = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Stripe Checkout Session creation error:', error);
+    console.error('Stripe Checkout Session creation error:', {
+      message: error.message,
+      type: error.type,
+      code: error.code,
+      statusCode: error.statusCode,
+      raw: error.raw ? error.raw.message : null
+    });
+    
+    // Provide more helpful error messages
+    let errorMessage = error.message || 'Failed to create checkout session';
+    if (error.type === 'StripeAuthenticationError') {
+      errorMessage = 'Invalid Stripe API key. Please check your STRIPE_SECRET_KEY in Vercel environment variables.';
+    } else if (error.type === 'StripeAPIError') {
+      errorMessage = `Stripe API error: ${error.message}`;
+    }
+    
     res.status(500).json({
       success: false,
-      error: error.message || 'Failed to create checkout session'
+      error: errorMessage,
+      errorType: error.type,
+      errorCode: error.code
     });
   }
 };
