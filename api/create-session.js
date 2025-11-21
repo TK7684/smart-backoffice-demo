@@ -20,6 +20,15 @@ module.exports = async (req, res) => {
   }
 
   try {
+    // Check if Stripe secret key is set
+    if (!process.env.STRIPE_SECRET_KEY) {
+      console.error('STRIPE_SECRET_KEY environment variable is not set');
+      return res.status(500).json({
+        success: false,
+        error: 'Stripe secret key not configured. Please set STRIPE_SECRET_KEY in Vercel environment variables.'
+      });
+    }
+
     const { package, packageName, amount, currency, successUrl, cancelUrl } = req.body;
 
     // Validate required fields
