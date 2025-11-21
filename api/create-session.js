@@ -58,7 +58,7 @@ module.exports = async (req, res) => {
     });
     
     const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
+      payment_method_types: ['card', 'link'], // Enable Link for faster checkout
       line_items: [{
         price_data: {
           currency: currency || 'thb',
@@ -75,6 +75,12 @@ module.exports = async (req, res) => {
       metadata: {
         package: package || '',
         packageName: packageName || ''
+      },
+      // Enable Link authentication for returning customers
+      payment_method_options: {
+        link: {
+          enabled: true
+        }
       }
     });
     
