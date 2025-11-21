@@ -243,8 +243,14 @@ function doPost(e) {
         cancelUrl: data.cancelUrl || ''
       });
       
-      return ContentService.createTextOutput(JSON.stringify(checkoutResult))
-        .setMimeType(ContentService.MimeType.JSON);
+      return ContentService
+        .createTextOutput(JSON.stringify(checkoutResult))
+        .setMimeType(ContentService.MimeType.JSON)
+        .setHeaders({
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type'
+        });
     }
     
     // Check if this is a Stripe payment verification request
